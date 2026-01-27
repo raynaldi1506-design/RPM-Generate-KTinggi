@@ -1,0 +1,7 @@
+{
+  "name": " Generator RPM - Kelas Tinggi",
+  "description": "Aplikasi khusus guru Sekolah Dasar untuk menghasilkan Rencana Pembelajaran Mendalam (RPM) secara otomatis dengan struktur tabel yang rapi, lengkap dengan identitas, desain pembelajaran, dan asesmen.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

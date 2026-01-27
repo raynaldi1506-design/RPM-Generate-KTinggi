@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator RPM - SDN 14 Andopan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+            display: inline-block;
+            white-space: nowrap;
+            animation: marquee 20s linear infinite;
+        }
+        .marquee-container {
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* Base styles for the F4 Document (210mm x 330mm) */
+        .f4-preview-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            background: #cbd5e1;
+            padding: 20px 10px;
+            border-radius: 1.5rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .f4-page-container {
+            width: 210mm;
+            flex-shrink: 0;
+            background: white;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .f4-page {
+            width: 210mm;
+            min-height: 330mm;
+            padding: 15mm;
+            background: white;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 10pt;
+            line-height: 1.5;
+            color: black !important;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .f4-page * {
+            color: black !important;
+            box-sizing: border-box;
+        }
+
+        .table-spreadsheet {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: fixed !important;
+            border: 1pt solid black !important;
+            margin-bottom: 12pt;
+        }
+
+        .table-spreadsheet td, .table-spreadsheet th {
+            border: 0.75pt solid black !important;
+            padding: 6pt 8pt !important;
+            vertical-align: top !important;
+            text-align: left; /* Diubah dari justify ke left */
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            font-size: 10pt !important;
+        }
+
+        .col-key {
+            width: 60mm !important;
+            font-weight: bold;
+            background-color: #f8fafc !important;
+        }
+
+        .table-header-pink {
+            background-color: #fce4ec !important;
+            font-weight: bold;
+            text-align: center !important; /* Header tetap di tengah */
+            text-transform: uppercase;
+            padding: 8pt !important;
+            font-size: 10.5pt !important;
+            border: 1pt solid black !important;
+        }
+
+        .bg-gray-100 { background-color: #f1f5f9 !important; }
+        .bg-gray-200 { background-color: #e2e8f0 !important; }
+
+        .whitespace-pre-line {
+            white-space: pre-line;
+            display: block;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+
+        .meeting-badge {
+            display: inline-block;
+            padding: 3pt 10pt;
+            background: #1e1b4b;
+            color: white !important;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 9pt;
+            margin-bottom: 6pt;
+        }
+
+        .section-meeting {
+            border: 1pt solid #e2e8f0;
+            padding: 10pt;
+            margin-bottom: 20pt;
+            background: #ffffff;
+        }
+
+        .media-container {
+            width: 75mm !important;
+        }
+        
+        .media-wrapper {
+            border: 0.75pt solid black;
+            padding: 3pt;
+            text-align: center;
+        }
+
+        .media-wrapper img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Print Settings */
+        @media print {
+            body { background: white !important; margin: 0 !important; }
+            .no-print { display: none !important; }
+            .f4-preview-wrapper { padding: 0 !important; background: white !important; overflow: visible !important; display: block !important; }
+            .f4-page-container { box-shadow: none !important; margin: 0 !important; width: 210mm !important; }
+            .f4-page { padding: 15mm !important; width: 210mm !important; }
+            @page { size: 210mm 330mm; margin: 0; }
+        }
+
+        /* Custom Scrollbar for Form */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
+</body>
+</html>
