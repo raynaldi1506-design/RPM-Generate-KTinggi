@@ -1,9 +1,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { RPMFormData, GeneratedRPMContent } from "../types";
+import { RPMFormData, GeneratedRPMContent, ProtaEntry, PromesEntry } from "../types";
+
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getAITopics = async (subject: string, grade: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   const prompt = `Sebagai pakar Kurikulum Merdeka Indonesia, berikan daftar 10 topik materi pelajaran yang PALING AKURAT dan SESUAI dengan buku teks utama Kemendikbudristek untuk SEMESTER 2 (GENAP) TAHUN 2025:
     Mata Pelajaran: ${subject}
     Jenjang: SD
@@ -11,9 +13,7 @@ export const getAITopics = async (subject: string, grade: string) => {
     
     Ketentuan:
     1. Materi harus spesifik untuk Semester 2 (Bab-bab akhir buku).
-    2. Contoh: Jika Matematika Kelas 4, fokus pada Luas & Volume, Bangun Datar, atau Penyajian Data.
-    3. Jika IPAS Kelas 5, fokus pada Ekosistem, Magnet, Listrik, atau Warisan Budaya.
-    4. Output harus berupa JSON array of strings berisi judul topik yang profesional.`;
+    2. Output harus berupa JSON array of strings berisi judul topik yang profesional.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -35,17 +35,16 @@ export const getAITopics = async (subject: string, grade: string) => {
 };
 
 export const pregenerateCPandTP = async (subject: string, material: string, grade: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   const prompt = `Sebagai pakar Kurikulum Merdeka Indonesia versi 2025, buatkan detail berikut:
     Mata Pelajaran: ${subject}
     Materi: ${material}
     Kelas: ${grade} SD (Semester 2)
     
-    1. Capaian Pembelajaran (CP) sesuai regulasi Kemdikbudristek No. 12 Tahun 2024 yang relevan dengan topik ini.
+    1. Capaian Pembelajaran (CP) sesuai regulasi Kemdikbudristek No. 12 Tahun 2024.
     2. Minimal 3 Tujuan Pembelajaran (TP) yang logis dan operasional.
-    3. Daftar Dimensi Profil Pelajar Pancasila (Pilih: Keimanan & Ketakwaan, Kewargaan, Penalaran Kritis, Kreativitas, Kolaborasi, Kemandirian, Kesehatan, Komunikasi).
-    4. Saran jumlah pertemuan ideal untuk menuntaskan materi ini.
-    5. Saran Praktik Pedagogis utama (PjBL, Discovery, dll).
+    3. Daftar Dimensi Profil Pelajar Pancasila.
+    4. Saran jumlah pertemuan dan Praktik Pedagogis utama.
 
     Output dalam format JSON.`;
 
@@ -71,34 +70,92 @@ export const pregenerateCPandTP = async (subject: string, material: string, grad
   return JSON.parse(response.text || '{}');
 };
 
+export const generateProta = async (subject: string, grade: string): Promise<ProtaEntry[]> => {
+  const ai = getAI();
+  const prompt = `Sebagai pakar Kurikulum Merdeka, buatkan Program Tahunan (PROTA) lengkap untuk mata pelajaran ${subject} kelas ${grade} SD Tahun Pelajaran 2024/2025.
+  
+  Ketentuan:
+  1. Hasilkan daftar materi yang mencakup seluruh tahun (Semester 1 dan Semester 2).
+  2. Berikan alokasi Jam Pelajaran (JP) yang akurat sesuai standar kurikulum nasional.
+  3. Pastikan urutan materi logis dan sistematis.
+  
+  Output JSON array of objects.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            material: { type: Type.STRING },
+            hours: { type: Type.INTEGER },
+            semester: { type: Type.INTEGER }
+          },
+          required: ["material", "hours", "semester"]
+        }
+      }
+    }
+  });
+  return JSON.parse(response.text || '[]');
+};
+
+export const generatePromes = async (subject: string, grade: string, semester: number): Promise<PromesEntry[]> => {
+  const ai = getAI();
+  const prompt = `Sebagai pakar kurikulum, buatkan tabel Program Semester (PROMES) Kurikulum Merdeka Semester 2 (Januari-Juni 2025) untuk mata pelajaran ${subject} kelas ${grade} SD.
+  
+  Ketentuan:
+  1. Daftar materi harus lengkap untuk satu semester.
+  2. Alokasi JP harus logis (misal 3-5 JP per materi).
+  3. Pemetaan minggu harus spesifik menggunakan kode: "Jan-1", "Feb-2", "Mar-4", dst.
+  4. Sesuaikan dengan kalender pendidikan Indonesia (Januari-Juni).
+
+  Output JSON array of objects.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            material: { type: Type.STRING },
+            hours: { type: Type.INTEGER },
+            weeks: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["material", "hours", "weeks"]
+        }
+      }
+    }
+  });
+  return JSON.parse(response.text || '[]');
+};
+
 export const generateRPMContent = async (formData: RPMFormData): Promise<GeneratedRPMContent> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   const prompt = `
-    Buatkan konten otomatis untuk Rencana Pembelajaran Mendalam (RPM) SD Semester 2 Kurikulum Merdeka 2025:
+    Buatkan konten otomatis untuk Rencana Pembelajaran Mendalam (RPM) SD Semester 2 Kurikulum Merdeka 2025 yang SANGAT RINCI dan JELAS:
     - Mata Pelajaran: ${formData.subject}
     - Kelas: ${formData.grade}
     - Materi Pokok: ${formData.material}
-    - CP: ${formData.cp}
     - TP: ${formData.tp}
     - Praktik Pedagogis: ${formData.pedagogy.join(", ")}
-    - Dimensi Lulusan: ${formData.dimensions.join(", ")}
     - Jumlah Pertemuan: ${formData.meetingCount}
     
-    Instruksi Khusus untuk ${formData.meetingCount} Pertemuan:
-    Setiap pertemuan HARUS berbeda aktivitasnya namun berkesinambungan. 
-    Misal Pertemuan 1 fokus Membangun Pemahaman, Pertemuan 2 fokus Aplikasi/Proyek, Pertemuan 3 fokus Evaluasi/Refleksi.
+    STRUKTUR WAJIB:
+    1. KEGIATAN PENDAHULUAN (Rinci): Operasional (salam, doa, apersepsi, motivasi, acuan).
+    2. KEGIATAN INTI (Pembelajaran Mendalam): UNDERSTAND, APPLY, REFLECT dengan durasi waktu.
+    3. KEGIATAN PENUTUP: Simpulan, evaluasi, refleksi, tindak lanjut.
+    4. LKPD (Lembar Kerja Peserta Didik): Instruksi kerja yang menantang dan memicu berpikir tingkat tinggi.
+    5. SOAL FORMATIF: Hasilkan tepat 20 soal pilihan ganda (A, B, C, D) yang bertipe HOTS (Higher Order Thinking Skills). Sertakan kunci jawaban.
 
-    Persyaratan Output JSON:
-    1. students: Profil singkat siswa SD kelas tersebut.
-    2. interdisciplinary: Kaitan materi ini dengan mata pelajaran lain.
-    3. partnership: Melibatkan orang tua/komunitas.
-    4. environment: Penataan kelas/lingkungan yang mendukung.
-    5. digitalTools: Aplikasi/media digital yang relevan.
-    6. summary: Ringkasan materi yang padat dan jelas.
-    7. meetings: Array berisi tepat ${formData.meetingCount} objek meeting (opening, understand, apply, reflect, closing).
-    8. assessments: Detail asesmen awal, proses, dan akhir (technique, instrument, rubric).
-    9. lkpd: Lembar kerja siswa yang kreatif.
-    10. formativeQuestions: 10 soal pilihan ganda berkualitas tinggi.
+    Output JSON harus mengikuti skema yang ditentukan.
   `;
 
   const response = await ai.models.generateContent({
@@ -127,18 +184,18 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
                 },
                 understand: {
                   type: Type.OBJECT,
-                  properties: { type: { type: Type.STRING }, steps: { type: Type.STRING } },
-                  required: ["type", "steps"]
+                  properties: { type: { type: Type.STRING }, steps: { type: Type.STRING }, duration: { type: Type.STRING } },
+                  required: ["type", "steps", "duration"]
                 },
                 apply: {
                   type: Type.OBJECT,
-                  properties: { type: { type: Type.STRING }, steps: { type: Type.STRING } },
-                  required: ["type", "steps"]
+                  properties: { type: { type: Type.STRING }, steps: { type: Type.STRING }, duration: { type: Type.STRING } },
+                  required: ["type", "steps", "duration"]
                 },
                 reflect: {
                   type: Type.OBJECT,
-                  properties: { type: { type: Type.STRING }, steps: { type: Type.STRING } },
-                  required: ["type", "steps"]
+                  properties: { type: { type: Type.STRING }, steps: { type: Type.STRING }, duration: { type: Type.STRING } },
+                  required: ["type", "steps", "duration"]
                 },
                 closing: {
                   type: Type.OBJECT,
@@ -179,12 +236,7 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
                 question: { type: Type.STRING },
                 options: {
                   type: Type.OBJECT,
-                  properties: {
-                    a: { type: Type.STRING },
-                    b: { type: Type.STRING },
-                    c: { type: Type.STRING },
-                    d: { type: Type.STRING }
-                  },
+                  properties: { a: { type: Type.STRING }, b: { type: Type.STRING }, c: { type: Type.STRING }, d: { type: Type.STRING } },
                   required: ["a", "b", "c", "d"]
                 },
                 answer: { type: Type.STRING }
@@ -203,23 +255,17 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
 
 export const generateRPMImage = async (material: string): Promise<string | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAI();
     const prompt = `Visual media for elementary students about "${material}". Clear, vibrant educational illustration. Clean style, no text.`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: prompt }]
-      },
-      config: {
-        imageConfig: { aspectRatio: "16:9" }
-      }
+      contents: { parts: [{ text: prompt }] },
+      config: { imageConfig: { aspectRatio: "16:9" } }
     });
 
     for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
     return null;
   } catch (error) {

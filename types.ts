@@ -19,9 +19,9 @@ export enum GraduateDimension {
 
 export interface LearningStep {
   opening: { steps: string; duration: string };
-  understand: { type: string; steps: string };
-  apply: { type: string; steps: string };
-  reflect: { type: string; steps: string };
+  understand: { type: string; steps: string; duration: string };
+  apply: { type: string; steps: string; duration: string };
+  reflect: { type: string; steps: string; duration: string };
   closing: { steps: string; duration: string };
 }
 
@@ -52,6 +52,18 @@ export interface GeneratedRPMContent {
   };
   lkpd: string;
   formativeQuestions: FormativeQuestion[];
+}
+
+export interface ProtaEntry {
+  material: string;
+  hours: number;
+  semester: number;
+}
+
+export interface PromesEntry {
+  material: string;
+  hours: number;
+  weeks: string[]; // e.g. ["Jan-1", "Jan-2"]
 }
 
 export interface LibraryEntry {

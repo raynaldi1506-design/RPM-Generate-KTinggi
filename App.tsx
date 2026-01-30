@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -7,13 +8,17 @@ import {
   GraduateDimension, 
   RPMState, 
   SD_SUBJECTS,
-  LibraryEntry 
+  LibraryEntry,
+  ProtaEntry,
+  PromesEntry
 } from './types';
 import { 
   generateRPMContent, 
   generateRPMImage, 
   pregenerateCPandTP, 
-  getAITopics 
+  getAITopics,
+  generateProta,
+  generatePromes
 } from './services/geminiService';
 import { 
   Printer, 
@@ -33,7 +38,9 @@ import {
   Zap,
   Save,
   ChevronRight,
-  Trash2
+  Trash2,
+  Calendar,
+  ClipboardList
 } from 'lucide-react';
 
 const TEACHERS = [
@@ -50,6 +57,15 @@ const SD_GRADES = [
   "Kelas 4",
   "Kelas 5",
   "Kelas 6"
+];
+
+const SEMESTER_2_MONTHS = [
+  { name: "Januari", code: "Jan" },
+  { name: "Februari", code: "Feb" },
+  { name: "Maret", code: "Mar" },
+  { name: "April", code: "Apr" },
+  { name: "Mei", code: "Mei" },
+  { name: "Juni", code: "Jun" }
 ];
 
 const INITIAL_FORM: RPMFormData = {
@@ -89,6 +105,11 @@ export default function App() {
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState("");
+
+  // Prota/Promes States
+  const [protaData, setProtaData] = useState<ProtaEntry[] | null>(null);
+  const [promesData, setPromesData] = useState<PromesEntry[] | null>(null);
+  const [isGeneratingExtra, setIsGeneratingExtra] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('rpm_library');
@@ -194,14 +215,6 @@ export default function App() {
     }));
   };
 
-  const handleMultiSelect = (name: 'pedagogy' | 'dimensions', value: any) => {
-    setState(prev => {
-      const current = prev.formData[name] as any[];
-      const next = current.includes(value) ? current.filter(i => i !== value) : [...current, value];
-      return { ...prev, formData: { ...prev.formData, [name]: next } };
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -217,40 +230,65 @@ export default function App() {
     }
   };
 
-  const handleDownloadWord = () => {
-    const element = document.getElementById('rpm-print-area');
-    if (!element) return;
-    const html = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><style>
-        @page { size: 210mm 330mm; margin: 1.5cm; }
-        body { font-family: 'Times New Roman', serif; font-size: 10pt; line-height: 1.5; color: black; }
-        table { border-collapse: collapse; width: 100%; border: 0.5pt solid black; margin-bottom: 12pt; table-layout: fixed; }
-        td, th { border: 0.5pt solid black; padding: 6pt; vertical-align: top; text-align: left; word-wrap: break-word; font-size: 10pt; }
-        .table-header-pink { background-color: #fce4ec; font-weight: bold; text-align: center; }
-        .col-key { width: 30%; background-color: #f8fafc; font-weight: bold; }
-        .meeting-badge { display: inline-block; padding: 2pt 8pt; background: #1e1b4b; color: white; font-weight: bold; margin-bottom: 4pt; }
-      </style></head>
-      <body>${element.innerHTML}</body></html>`;
-    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `RPM_2025_${state.formData.material.replace(/\s+/g, '_')}.doc`;
-    link.click();
+  const handleGenProta = async () => {
+    setIsGeneratingExtra(true);
+    try {
+      const data = await generateProta(state.formData.subject, state.formData.grade);
+      setProtaData(data);
+    } catch (e) {
+      alert("Gagal membuat Prota");
+    } finally {
+      setIsGeneratingExtra(false);
+    }
   };
 
-  const handleDownloadPDF = () => {
-    const element = document.getElementById('rpm-print-area');
-    if (!element) return;
-    const opt = {
-      margin: 0,
-      filename: `RPM_2025_${state.formData.material.replace(/\s+/g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: [210, 330], orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(element).save();
+  const handleGenPromes = async () => {
+    setIsGeneratingExtra(true);
+    try {
+      const data = await generatePromes(state.formData.subject, state.formData.grade, 2);
+      setPromesData(data);
+    } catch (e) {
+      alert("Gagal membuat Promes");
+    } finally {
+      setIsGeneratingExtra(false);
+    }
   };
+
+  // Improved Generic Download Logic
+  const downloadDocument = (elementId: string, filename: string, type: 'pdf' | 'word') => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    if (type === 'pdf') {
+      const opt = {
+        margin: 5,
+        filename: `${filename}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(element).save();
+    } else {
+      const html = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><style>
+          body { font-family: 'Times New Roman', serif; font-size: 10pt; line-height: 1.5; }
+          table { border-collapse: collapse; width: 100%; border: 1pt solid black; }
+          td, th { border: 1pt solid black; padding: 6pt; vertical-align: top; text-align: left; }
+          .text-center { text-align: center !important; }
+          .bg-header { background-color: #fce4ec; font-weight: bold; }
+        </style></head>
+        <body>${element.innerHTML}</body></html>`;
+      const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${filename}.doc`;
+      link.click();
+    }
+  };
+
+  const handleDownloadWord = () => downloadDocument('rpm-print-area', `RPM_2025_${state.formData.material.replace(/\s+/g, '_')}`, 'word');
+  const handleDownloadPDF = () => downloadDocument('rpm-print-area', `RPM_2025_${state.formData.material.replace(/\s+/g, '_')}`, 'pdf');
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -280,6 +318,194 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Improved Prota Modal */}
+      {protaData && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-4xl max-h-[85vh] rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-indigo-900 p-8 flex justify-between items-center text-white shrink-0">
+              <div className="flex items-center gap-4">
+                <ClipboardList size={32} className="text-amber-400" />
+                <div>
+                   <h3 className="text-2xl font-black tracking-tight uppercase">PROGRAM TAHUNAN (PROTA)</h3>
+                   <p className="text-xs text-indigo-300 font-bold">{state.formData.subject} - {state.formData.grade}</p>
+                </div>
+              </div>
+              <button onClick={() => setProtaData(null)} className="text-3xl font-bold hover:text-red-400 transition-colors">&times;</button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-10 bg-slate-50">
+              <div id="prota-print-area" className="bg-white p-8 shadow-sm border border-slate-200">
+                <div className="text-center mb-10">
+                  <h2 className="text-xl font-bold underline uppercase">PROGRAM TAHUNAN (PROTA)</h2>
+                  <p className="font-bold uppercase mt-2">KURIKULUM MERDEKA TAHUN PELAJARAN 2024/2025</p>
+                  <div className="flex justify-center gap-10 mt-6 text-sm font-bold">
+                    <span>Mata Pelajaran: {state.formData.subject}</span>
+                    <span>Satuan Pendidikan: {state.formData.schoolName}</span>
+                    <span>Kelas: {state.formData.grade}</span>
+                  </div>
+                </div>
+
+                <table className="table-spreadsheet">
+                  <thead>
+                    <tr className="table-header-pink">
+                      <th className="w-[8%] text-center">No</th>
+                      <th className="w-[15%] text-center">Semester</th>
+                      <th className="w-[60%]">Materi / Lingkup Materi</th>
+                      <th className="w-[17%] text-center">Alokasi JP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {protaData.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-indigo-50/50 transition-colors">
+                        <td className="text-center">{idx + 1}</td>
+                        <td className="text-center font-bold">{item.semester}</td>
+                        <td className="px-4">{item.material}</td>
+                        <td className="text-center font-black text-indigo-700">{item.hours} JP</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-indigo-50 font-black">
+                      <td colSpan={3} className="text-right px-6 py-4 uppercase">Total Alokasi Waktu per Tahun</td>
+                      <td className="text-center py-4">{protaData.reduce((sum, i) => sum + i.hours, 0)} JP</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="mt-16 grid grid-cols-2 text-center text-[10pt]">
+                   <div>
+                     <p>Mengetahui,</p><p>Kepala Sekolah</p><div className="h-[60pt]"></div>
+                     <p className="font-bold underline uppercase">{state.formData.principalName}</p>
+                     <p>NIP. {state.formData.principalNip}</p>
+                   </div>
+                   <div>
+                     <p>Andopan, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                     <p>Guru Kelas</p><div className="h-[60pt]"></div>
+                     <p className="font-bold underline uppercase">{state.formData.teacherName}</p>
+                     <p>NIP. {state.formData.teacherNip}</p>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-white border-t flex justify-end gap-3 no-print">
+               <button 
+                  onClick={() => downloadDocument('prota-print-area', `PROTA_${state.formData.subject.replace(/\s+/g, '_')}`, 'word')}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-xs hover:bg-blue-700 transition-all shadow-md"
+               >
+                 <Download size={16} /> WORD
+               </button>
+               <button 
+                  onClick={() => downloadDocument('prota-print-area', `PROTA_${state.formData.subject.replace(/\s+/g, '_')}`, 'pdf')}
+                  className="flex items-center gap-2 px-6 py-3 bg-rose-600 text-white rounded-2xl font-black text-xs hover:bg-rose-700 transition-all shadow-md"
+               >
+                 <FileDown size={16} /> PDF
+               </button>
+               <button 
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs hover:bg-indigo-700 transition-all shadow-md"
+               >
+                 <Printer size={16} /> CETAK
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promes Modal */}
+      {promesData && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-[95vw] max-h-[90vh] rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-indigo-900 p-6 flex justify-between items-center text-white shrink-0">
+              <div className="flex items-center gap-4">
+                <Calendar size={28} className="text-emerald-400" />
+                <div>
+                  <h3 className="text-xl font-black tracking-tight uppercase">PROGRAM SEMESTER (PROMES)</h3>
+                  <p className="text-[10px] font-bold text-indigo-300">SEMESTER 2 - {state.formData.subject} - {state.formData.grade}</p>
+                </div>
+              </div>
+              <button onClick={() => setPromesData(null)} className="text-3xl font-bold hover:text-red-400 transition-colors">&times;</button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-slate-50">
+              <div id="promes-print-area" className="bg-white p-6 shadow-sm border border-slate-200" style={{ minWidth: '1100px' }}>
+                <div className="text-center mb-8">
+                  <h2 className="text-xl font-bold underline uppercase">PROGRAM SEMESTER (PROMES)</h2>
+                  <p className="font-bold uppercase mt-2">SEMESTER 2 TAHUN PELAJARAN 2024/2025</p>
+                  <div className="flex justify-center gap-10 mt-4 text-sm font-bold">
+                    <span>Mata Pelajaran: {state.formData.subject}</span>
+                    <span>Kelas: {state.formData.grade}</span>
+                  </div>
+                </div>
+
+                <table className="table-spreadsheet bg-white shadow-sm">
+                  <thead>
+                    <tr className="bg-indigo-700 text-white font-bold text-center">
+                      <th rowSpan={2} className="w-[3%]">No</th>
+                      <th rowSpan={2} className="w-[30%]">Tujuan Pembelajaran / Lingkup Materi</th>
+                      <th rowSpan={2} className="w-[5%]">JP</th>
+                      {SEMESTER_2_MONTHS.map(m => (
+                        <th key={m.code} colSpan={4} className="border-l border-white/20 uppercase text-[9px]">{m.name}</th>
+                      ))}
+                    </tr>
+                    <tr className="bg-indigo-600 text-white font-bold text-[8pt] text-center">
+                      {SEMESTER_2_MONTHS.map(m => (
+                        <React.Fragment key={`${m.code}-weeks`}>
+                          <th className="border-l border-white/10">1</th>
+                          <th className="border-l border-white/10">2</th>
+                          <th className="border-l border-white/10">3</th>
+                          <th className="border-l border-white/10">4</th>
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="text-[9pt]">
+                    {promesData.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-indigo-50/50 transition-colors">
+                        <td className="text-center font-bold text-slate-400">{idx + 1}</td>
+                        <td className="font-bold text-slate-700 px-4">{item.material}</td>
+                        <td className="text-center font-black text-indigo-700">{item.hours}</td>
+                        {SEMESTER_2_MONTHS.map(m => (
+                          <React.Fragment key={`${m.code}-checks`}>
+                            {[1, 2, 3, 4].map(w => {
+                              const isScheduled = item.weeks.some(sw => sw.includes(m.code) && sw.includes(w.toString()));
+                              return (
+                                <td key={`${m.code}-${w}`} className={`text-center border-l ${isScheduled ? 'bg-emerald-400/20' : ''}`}>
+                                  {isScheduled && <div className="mx-auto w-3 h-3 bg-emerald-600 rounded-full"></div>}
+                                </td>
+                              );
+                            })}
+                          </React.Fragment>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="p-6 bg-white border-t flex justify-end gap-3 no-print">
+               <button 
+                  onClick={() => downloadDocument('promes-print-area', `PROMES_${state.formData.subject.replace(/\s+/g, '_')}`, 'word')}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black text-xs hover:bg-blue-700 transition-all shadow-md"
+               >
+                 <Download size={16} /> WORD
+               </button>
+               <button 
+                  onClick={() => downloadDocument('promes-print-area', `PROMES_${state.formData.subject.replace(/\s+/g, '_')}`, 'pdf')}
+                  className="flex items-center gap-2 px-6 py-3 bg-rose-600 text-white rounded-2xl font-black text-xs hover:bg-rose-700 transition-all shadow-md"
+               >
+                 <FileDown size={16} /> PDF
+               </button>
+               <button 
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs hover:bg-indigo-700 transition-all shadow-md"
+               >
+                 <Printer size={16} /> CETAK
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Library Modal */}
       {showLibrary && (
@@ -392,16 +618,25 @@ export default function App() {
                       {SD_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Jml Pertemuan</label>
-                    <input 
-                      type="number" 
-                      name="meetingCount" 
-                      min="1" max="10"
-                      value={state.formData.meetingCount} 
-                      onChange={handleInputChange} 
-                      className="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold bg-slate-50 focus:bg-white outline-none" 
-                    />
+                  <div className="col-span-2 grid grid-cols-2 gap-4">
+                    <button 
+                      type="button" 
+                      onClick={handleGenProta}
+                      disabled={isGeneratingExtra}
+                      className="flex items-center justify-center gap-2 py-4 bg-amber-100 text-amber-800 rounded-2xl font-black text-sm hover:bg-amber-200 transition-all border-2 border-amber-200 shadow-sm active:scale-95"
+                    >
+                      {isGeneratingExtra ? <Loader2 className="animate-spin" size={18}/> : <ClipboardList size={20} />} 
+                      GENERATE PROTA
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={handleGenPromes}
+                      disabled={isGeneratingExtra}
+                      className="flex items-center justify-center gap-2 py-4 bg-emerald-100 text-emerald-800 rounded-2xl font-black text-sm hover:bg-emerald-200 transition-all border-2 border-emerald-200 shadow-sm active:scale-95"
+                    >
+                      {isGeneratingExtra ? <Loader2 className="animate-spin" size={18}/> : <Calendar size={20} />} 
+                      GENERATE PROMES
+                    </button>
                   </div>
                 </div>
               </div>
@@ -564,14 +799,44 @@ export default function App() {
                           <div className="meeting-badge">SESI PERTEMUAN KE-{idx + 1}</div>
                           <table className="table-spreadsheet">
                             <tbody>
-                              <tr className="bg-gray-100"><td colSpan={2} className="font-bold">1. KEGIATAN PENDAHULUAN ({meeting.opening.duration})</td></tr>
-                              <tr><td colSpan={2} className="whitespace-pre-line pl-4">{meeting.opening.steps}</td></tr>
-                              <tr className="bg-gray-100"><td colSpan={2} className="font-bold">2. KEGIATAN INTI</td></tr>
-                              <tr><td className="col-key pl-4">A. Understand<br/><span className="italic font-normal text-[9pt]">({meeting.understand.type})</span></td><td>{meeting.understand.steps}</td></tr>
-                              <tr><td className="col-key pl-4">B. Apply<br/><span className="italic font-normal text-[9pt]">({meeting.apply.type})</span></td><td>{meeting.apply.steps}</td></tr>
-                              <tr><td className="col-key pl-4">C. Reflect<br/><span className="italic font-normal text-[9pt]">({meeting.reflect.type})</span></td><td>{meeting.reflect.steps}</td></tr>
-                              <tr className="bg-gray-100"><td colSpan={2} className="font-bold">3. KEGIATAN PENUTUP ({meeting.closing.duration})</td></tr>
-                              <tr><td colSpan={2} className="whitespace-pre-line pl-4">{meeting.closing.steps}</td></tr>
+                              <tr className="bg-gray-100">
+                                <td colSpan={2} className="font-bold text-center">1. KEGIATAN PENDAHULUAN ({meeting.opening.duration})</td>
+                              </tr>
+                              <tr>
+                                <td colSpan={2} className="whitespace-pre-line pl-4">{meeting.opening.steps}</td>
+                              </tr>
+                              
+                              <tr className="bg-gray-100">
+                                <td colSpan={2} className="font-bold text-center">2. KEGIATAN INTI (CORE DEEP LEARNING)</td>
+                              </tr>
+                              <tr>
+                                <td className="col-key pl-4">A. Understand (Memahami)<br/>
+                                  <span className="italic font-normal text-[9pt]">({meeting.understand.type})</span><br/>
+                                  <span className="font-bold text-[9pt] underline">Waktu: {meeting.understand.duration}</span>
+                                </td>
+                                <td>{meeting.understand.steps}</td>
+                              </tr>
+                              <tr>
+                                <td className="col-key pl-4">B. Apply (Aplikasi)<br/>
+                                  <span className="italic font-normal text-[9pt]">({meeting.apply.type})</span><br/>
+                                  <span className="font-bold text-[9pt] underline">Waktu: {meeting.apply.duration}</span>
+                                </td>
+                                <td>{meeting.apply.steps}</td>
+                              </tr>
+                              <tr>
+                                <td className="col-key pl-4">C. Reflect (Refleksi)<br/>
+                                  <span className="italic font-normal text-[9pt]">({meeting.reflect.type})</span><br/>
+                                  <span className="font-bold text-[9pt] underline">Waktu: {meeting.reflect.duration}</span>
+                                </td>
+                                <td>{meeting.reflect.steps}</td>
+                              </tr>
+                              
+                              <tr className="bg-gray-100">
+                                <td colSpan={2} className="font-bold text-center">3. KEGIATAN PENUTUP ({meeting.closing.duration})</td>
+                              </tr>
+                              <tr>
+                                <td colSpan={2} className="whitespace-pre-line pl-4">{meeting.closing.steps}</td>
+                              </tr>
                             </tbody>
                           </table>
                         </div>
@@ -637,6 +902,41 @@ export default function App() {
                           </tr>
                         </tbody>
                       </table>
+                    </div>
+
+                    <div className="page-break pt-8">
+                      <div className="bg-[#fce4ec] border border-black text-center font-bold uppercase p-2 mb-6 text-[11pt]">
+                        V. LEMBAR KERJA PESERTA DIDIK (LKPD)
+                      </div>
+                      <div className="border border-black p-6 mb-8 text-left leading-relaxed whitespace-pre-line">
+                        {state.generatedContent.lkpd}
+                      </div>
+
+                      <div className="bg-[#fce4ec] border border-black text-center font-bold uppercase p-2 mb-6 text-[11pt]">
+                        VI. SOAL FORMATIF (HOTS)
+                      </div>
+                      <div className="space-y-6 text-left">
+                        {state.generatedContent.formativeQuestions.map((q, qIdx) => (
+                          <div key={qIdx} className="pb-4 border-b border-dashed border-slate-300">
+                            <p className="font-bold mb-2">{qIdx + 1}. {q.question}</p>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 pl-4">
+                              <p>A. {q.options.a}</p>
+                              <p>B. {q.options.b}</p>
+                              <p>C. {q.options.c}</p>
+                              <p>D. {q.options.d}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-8 p-4 bg-slate-50 border border-black">
+                        <p className="font-bold underline mb-2">KUNCI JAWABAN SOAL FORMATIF:</p>
+                        <div className="grid grid-cols-5 gap-2 text-[9pt] font-bold">
+                          {state.generatedContent.formativeQuestions.map((q, idx) => (
+                            <span key={idx}>{idx + 1}. {q.answer.toUpperCase()}</span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
