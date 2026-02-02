@@ -44,6 +44,8 @@ export interface GeneratedRPMContent {
   environment: string;
   digitalTools: string;
   summary: string;
+  pedagogy: string;
+  dimensions: string;
   meetings: LearningStep[];
   assessments: {
     initial: AssessmentDetail;

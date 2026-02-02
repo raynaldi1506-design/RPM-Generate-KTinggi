@@ -1,19 +1,22 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { RPMFormData, GeneratedRPMContent, ProtaEntry, PromesEntry } from "../types";
+import { RPMFormData, GeneratedRPMContent, ProtaEntry, PromesEntry, PedagogicalPractice, GraduateDimension } from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const getAITopics = async (subject: string, grade: string) => {
+export const getAITopics = async (subject: string, grade: string, searchQuery?: string) => {
   const ai = getAI();
-  const prompt = `Sebagai pakar Kurikulum Merdeka Indonesia, berikan daftar 10 topik materi pelajaran yang PALING AKURAT dan SESUAI dengan buku teks utama Kemendikbudristek untuk SEMESTER 2 (GENAP) TAHUN 2025:
-    Mata Pelajaran: ${subject}
-    Jenjang: SD
-    Kelas: ${grade}
-    
-    Ketentuan:
-    1. Materi harus spesifik untuk Semester 2 (Bab-bab akhir buku).
-    2. Output harus berupa JSON array of strings berisi judul topik yang profesional.`;
+  const prompt = searchQuery 
+    ? `Sebagai pakar Kurikulum Merdeka Indonesia, berikan 5 judul topik materi yang spesifik berkaitan dengan "${searchQuery}" untuk mata pelajaran ${subject} kelas ${grade} SD Semester 2.
+       Pastikan judul materi profesional dan sesuai dengan buku teks Kemendikbudristek terbaru.
+       Output harus berupa JSON array of strings.`
+    : `Sebagai pakar Kurikulum Merdeka Indonesia, berikan daftar 10 topik materi pelajaran yang PALING AKURAT dan SESUAI dengan buku teks utama Kemendikbudristek untuk SEMESTER 2 (GENAP) TAHUN 2025:
+       Mata Pelajaran: ${subject}
+       Jenjang: SD
+       Kelas: ${grade}
+       Ketentuan:
+       1. Materi harus spesifik untuk Semester 2 (Bab-bab akhir buku).
+       2. Output harus berupa JSON array of strings berisi judul topik yang profesional.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -41,10 +44,12 @@ export const pregenerateCPandTP = async (subject: string, material: string, grad
     Materi: ${material}
     Kelas: ${grade} SD (Semester 2)
     
+    TUGAS:
     1. Capaian Pembelajaran (CP) sesuai regulasi Kemdikbudristek No. 12 Tahun 2024.
     2. Minimal 3 Tujuan Pembelajaran (TP) yang logis dan operasional.
-    3. Daftar Dimensi Profil Pelajar Pancasila.
-    4. Saran jumlah pertemuan dan Praktik Pedagogis utama.
+    3. Pilih Dimensi Profil Pelajar Pancasila yang PALING RELEVAN dari daftar ini SAJA: ${Object.values(GraduateDimension).join(", ")}.
+    4. Pilih Praktik Pedagogis yang PALING COCOK dari daftar ini SAJA: ${Object.values(PedagogicalPractice).join(", ")}.
+    5. Saran jumlah pertemuan.
 
     Output dalam format JSON.`;
 
@@ -144,18 +149,32 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
     - Mata Pelajaran: ${formData.subject}
     - Kelas: ${formData.grade}
     - Materi Pokok: ${formData.material}
+    - CP: ${formData.cp}
     - TP: ${formData.tp}
-    - Praktik Pedagogis: ${formData.pedagogy.join(", ")}
+    - Praktik Pedagogis Terpilih: ${formData.pedagogy.join(", ")}
+    - Profil Pelajar Pancasila Terpilih: ${formData.dimensions.join(", ")}
     - Jumlah Pertemuan: ${formData.meetingCount}
     
-    STRUKTUR WAJIB:
-    1. KEGIATAN PENDAHULUAN (Rinci): Operasional (salam, doa, apersepsi, motivasi, acuan).
-    2. KEGIATAN INTI (Pembelajaran Mendalam): UNDERSTAND, APPLY, REFLECT dengan durasi waktu.
-    3. KEGIATAN PENUTUP: Simpulan, evaluasi, refleksi, tindak lanjut.
-    4. LKPD (Lembar Kerja Peserta Didik): Instruksi kerja yang menantang dan memicu berpikir tingkat tinggi.
-    5. SOAL FORMATIF: Hasilkan tepat 20 soal pilihan ganda (A, B, C, D) yang bertipe HOTS (Higher Order Thinking Skills). Sertakan kunci jawaban.
+    STRUKTUR WAJIB DALAM JSON:
+    1. STUDENTS: Karakteristik peserta didik yang relevan.
+    2. INTERDISCIPLINARY: Kaitan dengan mata pelajaran lain.
+    3. PARTNERSHIP: Pelibatan orang tua/masyarakat.
+    4. ENVIRONMENT: Pemanfaatan lingkungan belajar.
+    5. DIGITALTOOLS: Alat bantu digital yang digunakan.
+    6. SUMMARY: Ringkasan materi esensial dalam poin-poin.
+    7. PEDAGOGY: Jelaskan implementasi Praktik Pedagogis utama yang digunakan (integrasikan dengan materi).
+    8. DIMENSIONS: Jelaskan bagaimana Dimensi Profil Pelajar Pancasila dikembangkan dalam pembelajaran ini.
+    9. MEETINGS: Detail setiap pertemuan (Pendahuluan, Inti: Understand, Apply, Reflect, Penutup). Langkah-langkah harus bernomor urut ke bawah.
+    10. ASSESSMENTS: Detail asesmen Awal, Proses, dan Akhir (Teknik, Instrumen, Rubrik).
+    11. LKPD: Instruksi kerja terperinci untuk peserta didik.
+    12. FORMATIVEQUESTIONS: Buatkan tepat 20 soal pilihan ganda (A, B, C, D) yang WAJIB memenuhi kriteria HOTS (Higher Order Thinking Skills):
+        - Level Kognitif: Minimal C4 (Analisis), C5 (Evaluasi), atau C6 (Mencipta).
+        - Stimulus: Setiap soal harus diawali dengan stimulus kontekstual (kasus, data, atau situasi nyata).
+        - Konstruksi Soal: Gunakan kata kerja operasional HOTS.
+        - Opsi Jawaban: Harus homogen, logis, dan tidak bias.
+        - Kunci Jawaban: Berikan kunci yang akurat.
 
-    Output JSON harus mengikuti skema yang ditentukan.
+    PENTING: Pastikan semua teks mendukung baris baru (\\n) untuk tampilan yang rapi.
   `;
 
   const response = await ai.models.generateContent({
@@ -172,6 +191,8 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
           environment: { type: Type.STRING },
           digitalTools: { type: Type.STRING },
           summary: { type: Type.STRING },
+          pedagogy: { type: Type.STRING },
+          dimensions: { type: Type.STRING },
           meetings: {
             type: Type.ARRAY,
             items: {
@@ -245,7 +266,7 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
             }
           }
         },
-        required: ["students", "interdisciplinary", "partnership", "environment", "digitalTools", "summary", "meetings", "assessments", "lkpd", "formativeQuestions"]
+        required: ["students", "interdisciplinary", "partnership", "environment", "digitalTools", "summary", "pedagogy", "dimensions", "meetings", "assessments", "lkpd", "formativeQuestions"]
       }
     }
   });
@@ -256,7 +277,7 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
 export const generateRPMImage = async (material: string): Promise<string | null> => {
   try {
     const ai = getAI();
-    const prompt = `Visual media for elementary students about "${material}". Clear, vibrant educational illustration. Clean style, no text.`;
+    const prompt = `Highly educational, detailed and clear illustration for elementary school students about the topic: "${material}". The style should be vibrant, 3D render or professional flat vector art, clean background, no text, informative and safe for children. Suitable for a teaching aid.`;
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -269,6 +290,6 @@ export const generateRPMImage = async (material: string): Promise<string | null>
     }
     return null;
   } catch (error) {
-    return `https://picsum.photos/seed/${encodeURIComponent(material)}/800/450`;
+    return null;
   }
 };

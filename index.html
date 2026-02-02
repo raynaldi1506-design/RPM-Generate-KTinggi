@@ -26,27 +26,36 @@
             width: 100%;
             overflow-x: auto;
             background: #cbd5e1;
-            padding: 20px 10px;
-            border-radius: 1.5rem;
+            padding: 40px 20px;
+            border-radius: 2rem;
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
+            scrollbar-width: thin;
+            scrollbar-color: #94a3b8 transparent;
+        }
+        
+        @media (min-width: 1024px) {
+            .f4-preview-wrapper {
+                justify-content: center;
+            }
         }
 
         .f4-page-container {
             width: 210mm;
             flex-shrink: 0;
             background: white;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+            margin: 0 auto;
         }
 
         .f4-page {
             width: 210mm;
             min-height: 330mm;
-            padding: 15mm;
+            padding: 20mm 15mm;
             background: white;
             font-family: 'Times New Roman', Times, serif;
-            font-size: 10pt;
-            line-height: 1.5;
+            font-size: 11pt;
+            line-height: 1.4;
             color: black !important;
             box-sizing: border-box;
             position: relative;
@@ -61,34 +70,64 @@
             width: 100% !important;
             border-collapse: collapse !important;
             table-layout: fixed !important;
-            border: 1pt solid black !important;
+            border: 1.5pt solid black !important;
             margin-bottom: 12pt;
         }
 
         .table-spreadsheet td, .table-spreadsheet th {
-            border: 0.75pt solid black !important;
+            border: 1pt solid black !important;
             padding: 6pt 8pt !important;
             vertical-align: top !important;
-            text-align: left; /* Diubah dari justify ke left */
+            text-align: left;
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
-            font-size: 10pt !important;
+            font-size: 10.5pt !important;
+        }
+
+        .table-signatures {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            border: none !important;
+            margin-top: 30pt;
+        }
+
+        .table-signatures td {
+            border: none !important;
+            width: 50%;
+            text-align: center;
+            vertical-align: top;
+            padding: 0 !important;
+        }
+
+        /* Styling for Answer Key Table (Stable for Word/PDF) */
+        .table-answer-key {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            border: 1pt solid black !important;
+            margin-top: 10pt;
+        }
+        .table-answer-key td {
+            border: 1pt solid black !important;
+            padding: 4pt !important;
+            text-align: center !important;
+            font-weight: bold !important;
+            width: 20%;
         }
 
         .col-key {
-            width: 60mm !important;
+            width: 55mm !important;
             font-weight: bold;
-            background-color: #f8fafc !important;
+            background-color: #f1f5f9 !important;
         }
 
         .table-header-pink {
             background-color: #fce4ec !important;
             font-weight: bold;
-            text-align: center !important; /* Header tetap di tengah */
+            text-align: center !important;
             text-transform: uppercase;
-            padding: 8pt !important;
-            font-size: 10.5pt !important;
-            border: 1pt solid black !important;
+            padding: 10pt !important;
+            font-size: 11pt !important;
+            border: 1.5pt solid black !important;
         }
 
         .bg-gray-100 { background-color: #f1f5f9 !important; }
@@ -105,59 +144,39 @@
 
         .meeting-badge {
             display: inline-block;
-            padding: 3pt 10pt;
+            padding: 4pt 12pt;
             background: #1e1b4b;
             color: white !important;
             font-weight: bold;
             text-transform: uppercase;
             font-size: 9pt;
-            margin-bottom: 6pt;
-        }
-
-        .section-meeting {
-            border: 1pt solid #e2e8f0;
-            padding: 10pt;
-            margin-bottom: 20pt;
-            background: #ffffff;
-        }
-
-        .media-container {
-            width: 75mm !important;
-        }
-        
-        .media-wrapper {
-            border: 0.75pt solid black;
-            padding: 3pt;
-            text-align: center;
-        }
-
-        .media-wrapper img {
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 0 auto;
+            margin-bottom: 8pt;
+            border-radius: 4px;
         }
 
         /* Print Settings */
         @media print {
-            body { background: white !important; margin: 0 !important; }
+            body { background: white !important; margin: 0 !important; padding: 0 !important; }
             .no-print { display: none !important; }
-            .f4-preview-wrapper { padding: 0 !important; background: white !important; overflow: visible !important; display: block !important; }
+            .f4-preview-wrapper { padding: 0 !important; background: white !important; overflow: visible !important; display: block !important; border-radius: 0 !important; }
             .f4-page-container { box-shadow: none !important; margin: 0 !important; width: 210mm !important; }
-            .f4-page { padding: 15mm !important; width: 210mm !important; }
+            .f4-page { padding: 15mm !important; width: 210mm !important; border: none !important; }
             @page { size: 210mm 330mm; margin: 0; }
         }
 
         /* Custom Scrollbar for Form */
         .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
             background: #f1f5f9;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #94a3b8;
             border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
         }
     </style>
 <script type="importmap">
@@ -172,7 +191,7 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-100 text-slate-900 overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
 </body>

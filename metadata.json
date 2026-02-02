@@ -1,7 +1,5 @@
 {
-  "name": " Generator RPM - Kelas Tinggi",
-  "description": "Aplikasi khusus guru Sekolah Dasar untuk menghasilkan Rencana Pembelajaran Mendalam (RPM) secara otomatis dengan struktur tabel yang rapi, lengkap dengan identitas, desain pembelajaran, dan asesmen.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "Generator RPM - SDN 14 Andopan",
+  "description": "Aplikasi khusus guru Sekolah Dasar untuk menghasilkan Rencana Pembelajaran Mendalam (RPM) otomatis dengan struktur F4 yang rapi, lengkap dengan Ringkasan Materi bergambar dan Soal HOTS.",
+  "requestFramePermissions": []
 }
