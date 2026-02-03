@@ -615,7 +615,7 @@ export default function App() {
                         <tr><td className="col-key">Karakteristik Siswa</td><td>{state.generatedContent.students}</td></tr>
                         <tr><td className="col-key">Kaitan Antar Mapel</td><td>{state.generatedContent.interdisciplinary}</td></tr>
                         <tr><td className="col-key">Praktik Pedagogis</td><td className="font-bold">{state.generatedContent.pedagogy}</td></tr>
-                        <tr><td className="col-key">Dimensi P3 Lulusan</td><td className="font-bold">{state.generatedContent.dimensions}</td></tr>
+                        <tr><td className="col-key">Dimensi Profil Lulusan</td><td className="font-bold">{state.generatedContent.dimensions}</td></tr>
                       </tbody>
                     </table>
 
@@ -769,7 +769,7 @@ export default function App() {
                </div>
                <h3 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">Belum Ada RPM</h3>
                <p className="text-slate-500 max-w-lg mx-auto text-lg leading-relaxed">
-                 Pilih topik di sebelah kiri. CP, TP, Pedagogi, dan Dimensi akan terisi otomatis oleh AI.
+                 Pilih topik di sebelah kiri. CP, TP, Pedagogi, and Dimensi akan terisi otomatis oleh AI.
                </p>
             </div>
           )}
