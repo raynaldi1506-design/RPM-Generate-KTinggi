@@ -814,18 +814,36 @@ export default function App() {
                     <table className="table-spreadsheet">
                       <tbody>{state.generatedContent.formativeQuestions.map((q, qIdx) => (
                         <tr key={qIdx}>
-                          <td className="text-center font-bold bg-slate-50" style={{width: '40px'}}>{qIdx + 1}</td>
+                          <td className="text-center font-bold bg-slate-50" style={{width: '40px', verticalAlign: 'middle'}}>{qIdx + 1}</td>
                           <td className="p-6">
-                            <p className="font-bold mb-4 leading-relaxed">{q.question}</p>
-                            <div className="grid grid-cols-2 gap-4 text-sm font-medium">
-                              <div className="flex gap-2"><span>A.</span><span>{q.options.a}</span></div>
-                              <div className="flex gap-2"><span>B.</span><span>{q.options.b}</span></div>
-                              <div className="flex gap-2"><span>C.</span><span>{q.options.c}</span></div>
-                              <div className="flex gap-2"><span>D.</span><span>{q.options.d}</span></div>
-                            </div>
+                            <p className="font-bold mb-4 leading-relaxed text-justify">{q.question}</p>
+                            <table style={{width: '100%', border: 'none !important'}}>
+                              <tbody>
+                                <tr><td style={{border: 'none !important', padding: '2pt 0 !important', width: '25px'}}>A.</td><td style={{border: 'none !important', padding: '2pt 0 !important'}}>{q.options.a}</td></tr>
+                                <tr><td style={{border: 'none !important', padding: '2pt 0 !important'}}>B.</td><td style={{border: 'none !important', padding: '2pt 0 !important'}}>{q.options.b}</td></tr>
+                                <tr><td style={{border: 'none !important', padding: '2pt 0 !important'}}>C.</td><td style={{border: 'none !important', padding: '2pt 0 !important'}}>{q.options.c}</td></tr>
+                                <tr><td style={{border: 'none !important', padding: '2pt 0 !important'}}>D.</td><td style={{border: 'none !important', padding: '2pt 0 !important'}}>{q.options.d}</td></tr>
+                              </tbody>
+                            </table>
                           </td>
                         </tr>
                       ))}</tbody>
+                    </table>
+
+                    <div className="mt-12 bg-indigo-900 text-white font-bold uppercase p-3 text-center border-[1.5pt] border-black">7. KUNCI JAWABAN</div>
+                    <table className="table-spreadsheet !mt-0">
+                      <tbody>
+                        {Array.from({ length: 2 }).map((_, rowIdx) => (
+                          <tr key={rowIdx}>
+                            {state.generatedContent?.formativeQuestions.slice(rowIdx * 10, (rowIdx + 1) * 10).map((q, qIdx) => (
+                              <td key={qIdx} className="text-center p-4 border border-black">
+                                <div className="text-[10px] text-slate-500 font-bold mb-1">{rowIdx * 10 + qIdx + 1}</div>
+                                <div className="text-lg font-black">{q.answer.toUpperCase()}</div>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
 
                     <table className="table-signatures mt-24">
