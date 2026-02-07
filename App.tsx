@@ -242,9 +242,20 @@ export default function App() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    let finalValue: any = value;
+
+    // JavaScript Validation for Meeting Count (1-10)
+    if (name === 'meetingCount') {
+      const num = parseInt(value);
+      if (isNaN(num)) finalValue = 1;
+      else if (num < 1) finalValue = 1;
+      else if (num > 10) finalValue = 10;
+      else finalValue = num;
+    }
+
     setState(prev => ({
       ...prev,
-      formData: { ...prev.formData, [name]: (name === 'meetingCount' ? parseInt(value) || 1 : value) }
+      formData: { ...prev.formData, [name]: finalValue }
     }));
   };
 
@@ -522,24 +533,32 @@ export default function App() {
                         </ul>
                       </div>
 
-                      <h4 className="font-bold underline mb-2">C. Aktivitas Eksplorasi:</h4>
+                      <h4 className="font-bold underline mb-4">C. Aktivitas Eksplorasi:</h4>
                       <table className="table-spreadsheet">
                         <thead className="table-header-pink">
-                          <tr><th className="text-center" style={{width: '40px'}}>No</th><th className="text-center">Aktivitas / Pertanyaan</th><th className="text-center">Hasil Eksplorasi / Jawaban</th></tr>
+                          <tr>
+                            <th className="text-center" style={{width: '40px'}}>No</th>
+                            <th className="text-center" style={{width: '35%'}}>Aktivitas / Pertanyaan</th>
+                            <th className="text-center">Hasil Eksplorasi / Jawaban Siswa</th>
+                          </tr>
                         </thead>
                         <tbody>
                           {lkpdData.tasks.map((task, idx) => (
                             <tr key={idx}>
-                              <td className="text-center font-bold">{task.no}</td>
-                              <td className="p-4">
-                                <p className="font-bold text-sm mb-1">{task.activity}</p>
-                                <p className="text-[10px] text-slate-500">{task.instruction}</p>
+                              <td className="text-center font-bold" style={{verticalAlign: 'middle'}}>{task.no}</td>
+                              <td className="p-4 bg-slate-50/50">
+                                <p className="font-bold text-sm mb-2">{task.activity}</p>
+                                <p className="text-[10px] text-slate-600 leading-tight italic">{task.instruction}</p>
                               </td>
-                              <td className="h-24"></td>
+                              <td className="h-32" style={{backgroundColor: '#fff'}}></td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
+
+                      <div className="mt-12 text-[10px] text-slate-400 italic text-right">
+                        Dicetak otomatis oleh Generator RPM SDN 14 Andopan - Deep Learning Kurikulum Merdeka
+                      </div>
                     </div>
                   )}
                </div>
@@ -591,19 +610,19 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Jml Pertemuan</label>
-                    <input type="number" name="meetingCount" value={state.formData.meetingCount} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50" min="1" max="10"/>
+                    <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Jml Pertemuan (1-10)</label>
+                    <input type="number" name="meetingCount" value={state.formData.meetingCount} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50 focus:border-indigo-500 outline-none" min="1" max="10"/>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <button type="button" onClick={handleGenProta} className="py-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-amber-100 transition-colors">
+                  <button type="button" onClick={handleGenProta} className="py-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-amber-100 transition-colors shadow-sm">
                     <ClipboardList size={20}/> PROTA
                   </button>
-                  <button type="button" onClick={handleGenPromes} className="py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 transition-colors">
+                  <button type="button" onClick={handleGenPromes} className="py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 transition-colors shadow-sm">
                     <Calendar size={20}/> PROMES
                   </button>
-                  <button type="button" onClick={handleGenLKPD} className="py-4 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 transition-colors">
+                  <button type="button" onClick={handleGenLKPD} className="py-4 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 transition-colors shadow-sm">
                     <BookOpen size={20}/> LKPD
                   </button>
                 </div>
