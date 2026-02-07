@@ -161,11 +161,18 @@ export const generateRPMContent = async (formData: RPMFormData): Promise<Generat
     - Materi Pokok: ${formData.material}
     - TP: ${formData.tp}
     - Praktik Pedagogis: ${formData.pedagogy.join(", ")}
+    - Jumlah Pertemuan: ${formData.meetingCount}
     
-    Ketentuan:
-    - Bagian "MEETINGS" harus sangat operasional (Understand, Apply, Reflect).
-    - Bagian "FORMATIVEQUESTIONS" harus 20 soal HOTS pilihan ganda.
-    - Gunakan bahasa Indonesia formal.
+    WAJIB:
+    - Hasilkan tepat ${formData.meetingCount} objek dalam array "meetings".
+    - Setiap pertemuan harus memiliki langkah-langkah yang berbeda dan progresif.
+    - Format langkah-langkah dalam "steps" (Opening, Understand, Apply, Reflect, Closing) HARUS dalam bentuk daftar bernomor susun ke bawah.
+    - Bagian assessments (initial, process, final) HARUS diuraikan dengan sangat rinci dan operasional:
+        * Teknik: (misal: Tes Tertulis, Observasi, Performa)
+        * Instrumen: (misal: Soal Pilihan Ganda, Lembar Pengamatan)
+        * Rubrik: (Berikan kriteria penilaian singkat yang jelas)
+    - Bagian "FORMATIVEQUESTIONS" harus berisi 20 soal HOTS pilihan ganda unik.
+    
     Output JSON.
   `;
 

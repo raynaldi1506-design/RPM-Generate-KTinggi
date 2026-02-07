@@ -67,6 +67,15 @@ const SD_GRADES = [
   "Kelas 6"
 ];
 
+const MEETING_THEMES = [
+  { header: "#e3f2fd", accent: "#1565c0", text: "#0d47a1" }, // Blue
+  { header: "#e8f5e9", accent: "#2e7d32", text: "#1b5e20" }, // Green
+  { header: "#fff3e0", accent: "#ef6c00", text: "#e65100" }, // Orange
+  { header: "#f3e5f5", accent: "#7b1fa2", text: "#4a148c" }, // Purple
+  { header: "#fce4ec", accent: "#c2185b", text: "#880e4f" }, // Pink
+  { header: "#e0f2f1", accent: "#00796b", text: "#004d40" }, // Teal
+];
+
 const SEMESTER_2_MONTHS = [
   { name: "Januari", code: "Jan" },
   { name: "Februari", code: "Feb" },
@@ -314,8 +323,77 @@ export default function App() {
     } else if (type === 'pdf') {
       html2pdf().from(element).set(opt).save();
     } else {
-      const html = `<html><body style="font-family:'Times New Roman'">${element.innerHTML}</body></html>`;
-      const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+      // WORD DOWNLOAD (Enhanced with Styles)
+      const contentHtml = element.innerHTML;
+      const htmlHeader = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>Export Word</title>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <style>
+            @page WordSection1 {
+              size: 210mm 330mm;
+              margin: 15mm 10mm 15mm 10mm;
+              mso-header-margin: 35.4pt;
+              mso-footer-margin: 35.4pt;
+              mso-paper-source: 0;
+            }
+            div.WordSection1 {
+              page: WordSection1;
+              font-family: 'Times New Roman', serif;
+            }
+            body {
+              font-family: 'Times New Roman', serif;
+              font-size: 11pt;
+            }
+            table {
+              border-collapse: collapse;
+              width: 100%;
+              border: 1.5pt solid black;
+              mso-border-alt: solid black 1.5pt;
+            }
+            td, th {
+              border: 1pt solid black;
+              mso-border-alt: solid black 1pt;
+              padding: 6pt;
+              vertical-align: top;
+            }
+            .table-header-pink {
+              background-color: #fce4ec !important;
+              font-weight: bold;
+              text-align: center;
+              mso-shading: #fce4ec;
+            }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: bold; }
+            .uppercase { text-transform: uppercase; }
+            .underline { text-decoration: underline; }
+            .meeting-badge {
+              background-color: #1e1b4b;
+              color: white;
+              padding: 4pt 8pt;
+              font-weight: bold;
+              display: inline-block;
+              mso-shading: #1e1b4b;
+            }
+            .page-break { page-break-before: always; }
+          </style>
+        </head>
+        <body>
+          <div class='WordSection1'>
+            ${contentHtml}
+          </div>
+        </body>
+        </html>`;
+
+      const blob = new Blob(['\ufeff', htmlHeader], { type: 'application/msword' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = `${filename}.doc`;
@@ -354,7 +432,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* MODALS for PROTA/PROMES */}
+      {/* PROTA/PROMES MODALS */}
       {(protaData || promesData) && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-indigo-950/80 backdrop-blur-md p-4 no-print">
           <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl">
@@ -370,7 +448,7 @@ export default function App() {
                     <>
                       <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM TAHUNAN (PROTA) 2025/2026</h2>
                       <table className="table-spreadsheet">
-                        <thead><tr className="table-header-pink"><th>No</th><th>Semester</th><th>Materi Pokok</th><th>Alokasi JP</th></tr></thead>
+                        <thead><tr className="table-header-pink"><th className="text-center">No</th><th className="text-center">Semester</th><th>Materi Pokok</th><th className="text-center">Alokasi JP</th></tr></thead>
                         <tbody>{protaData.map((item, idx) => (
                           <tr key={idx}><td className="text-center font-bold">{idx + 1}</td><td className="text-center">SMT {item.semester}</td><td>{item.material}</td><td className="text-center">{item.hours} JP</td></tr>
                         ))}</tbody>
@@ -589,7 +667,7 @@ export default function App() {
                 </div>
                 <div className="flex gap-4">
                   <button onClick={() => window.print()} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl flex items-center gap-2"><Eye size={18} /> PRINT PREVIEW PDF</button>
-                  <button onClick={() => downloadDocument('rpm-page-container', 'RPM', 'word')} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl">WORD</button>
+                  <button onClick={() => downloadDocument('rpm-page-container', 'RPM_' + state.formData.material, 'word')} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl flex items-center gap-2"><Download size={18} /> UNDUH WORD</button>
                 </div>
               </div>
 
@@ -619,24 +697,66 @@ export default function App() {
                       </tbody>
                     </table>
 
-                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-8">3. PENGALAMAN BELAJAR</div>
-                    {state.generatedContent.meetings.map((meeting, idx) => (
-                      <div key={idx} className="mb-10">
-                        <div className="meeting-badge">PERTEMUAN KE-{idx + 1}</div>
-                        <table className="table-spreadsheet">
-                          <tbody>
-                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center uppercase">A. Pendahuluan ({meeting.opening.duration})</td></tr>
-                            <tr><td colSpan={2} className="whitespace-pre-line pl-8 py-4 leading-relaxed">{meeting.opening.steps}</td></tr>
-                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center uppercase">B. Kegiatan Inti</td></tr>
-                            <tr><td className="col-key pl-8 italic">Understand</td><td className="whitespace-pre-line px-6 py-4">{meeting.understand.steps}</td></tr>
-                            <tr><td className="col-key pl-8 italic">Apply</td><td className="whitespace-pre-line px-6 py-4">{meeting.apply.steps}</td></tr>
-                            <tr><td className="col-key pl-8 italic">Reflect</td><td className="whitespace-pre-line px-6 py-4">{meeting.reflect.steps}</td></tr>
-                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center uppercase">C. Penutup ({meeting.closing.duration})</td></tr>
-                            <tr><td colSpan={2} className="whitespace-pre-line pl-8 py-4">{meeting.closing.steps}</td></tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    ))}
+                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-8">3. PENGALAMAN BELAJAR (PER PERTEMUAN)</div>
+                    
+                    {state.generatedContent.meetings.map((meeting, idx) => {
+                      const theme = MEETING_THEMES[idx % MEETING_THEMES.length];
+                      return (
+                        <div key={idx} className="mb-14 border-2 border-indigo-900/10 rounded-3xl p-6 bg-white shadow-sm overflow-hidden" style={{ borderColor: theme.accent + '20' }}>
+                          <div className="flex items-center justify-between mb-6 border-b pb-4">
+                            <div className="meeting-badge !m-0" style={{ backgroundColor: theme.accent }}>PERTEMUAN KE-{idx + 1}</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: theme.accent }}>Deep Learning Session</div>
+                          </div>
+                          
+                          <table className="table-spreadsheet !m-0" style={{ borderColor: theme.accent }}>
+                            <tbody>
+                              {/* KEGIATAN AWAL */}
+                              <tr style={{ backgroundColor: theme.header }}>
+                                <td colSpan={2} className="text-center font-bold uppercase py-4" style={{ color: theme.text }}>
+                                  A. KEGIATAN AWAL ({meeting.opening.duration})
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colSpan={2} className="p-8 leading-relaxed whitespace-pre-line text-justify">
+                                  {meeting.opening.steps}
+                                </td>
+                              </tr>
+
+                              {/* KEGIATAN INTI */}
+                              <tr style={{ backgroundColor: theme.header }}>
+                                <td colSpan={2} className="text-center font-bold uppercase py-4 border-t-2" style={{ borderColor: theme.accent, color: theme.text }}>
+                                  B. KEGIATAN INTI ({meeting.understand.duration} + {meeting.apply.duration} + {meeting.reflect.duration})
+                                </td>
+                              </tr>
+                              <tr>
+                                <td className="col-key italic" style={{ width: '150px', backgroundColor: theme.header + '80', color: theme.text }}>1. Understand</td>
+                                <td className="p-6 whitespace-pre-line text-justify leading-relaxed">{meeting.understand.steps}</td>
+                              </tr>
+                              <tr>
+                                <td className="col-key italic" style={{ backgroundColor: theme.header + '80', color: theme.text }}>2. Apply</td>
+                                <td className="p-6 whitespace-pre-line text-justify leading-relaxed">{meeting.apply.steps}</td>
+                              </tr>
+                              <tr>
+                                <td className="col-key italic" style={{ backgroundColor: theme.header + '80', color: theme.text }}>3. Reflect</td>
+                                <td className="p-6 whitespace-pre-line text-justify leading-relaxed">{meeting.reflect.steps}</td>
+                              </tr>
+
+                              {/* KEGIATAN AKHIR */}
+                              <tr style={{ backgroundColor: theme.header }}>
+                                <td colSpan={2} className="text-center font-bold uppercase py-4 border-t-2" style={{ borderColor: theme.accent, color: theme.text }}>
+                                  C. KEGIATAN AKHIR ({meeting.closing.duration})
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colSpan={2} className="p-8 leading-relaxed whitespace-pre-line text-justify">
+                                  {meeting.closing.steps}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
 
                     <div className="page-break"></div>
                     <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-12">4. RINGKASAN MATERI POKOK</div>
@@ -647,43 +767,81 @@ export default function App() {
                             {state.generatedContent.summary}
                           </td>
                           {state.generatedImageUrl && (
-                            <td className="w-[40%] p-4 text-center">
-                              <img src={state.generatedImageUrl} alt="Visual" className="w-full h-auto border border-black p-1 bg-white" />
+                            <td className="w-[40%] p-4 text-center bg-slate-50">
+                              <div className="border-2 border-black p-2 bg-white shadow-md">
+                                <img src={state.generatedImageUrl} alt="Visual" className="w-full h-auto" />
+                              </div>
                             </td>
                           )}
                         </tr>
                       </tbody>
                     </table>
 
+                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-10">5. ASESMEN PEMBELAJARAN</div>
+                    <table className="table-spreadsheet">
+                      <thead>
+                        <tr className="bg-slate-100 font-bold">
+                          <th className="text-center" style={{width: '20%'}}>Komponen</th>
+                          <th className="text-center" style={{width: '25%'}}>Teknik Penilaian</th>
+                          <th className="text-center" style={{width: '25%'}}>Instrumen Penilaian</th>
+                          <th className="text-center">Rubrik / Kriteria</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="font-bold text-center bg-slate-50">Awal (Diagnostik)</td>
+                          <td className="text-center">{state.generatedContent.assessments.initial.technique}</td>
+                          <td>{state.generatedContent.assessments.initial.instrument}</td>
+                          <td className="text-justify text-sm leading-relaxed">{state.generatedContent.assessments.initial.rubric}</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold text-center bg-slate-50">Proses (Formatif)</td>
+                          <td className="text-center">{state.generatedContent.assessments.process.technique}</td>
+                          <td>{state.generatedContent.assessments.process.instrument}</td>
+                          <td className="text-justify text-sm leading-relaxed">{state.generatedContent.assessments.process.rubric}</td>
+                        </tr>
+                        <tr>
+                          <td className="font-bold text-center bg-slate-50">Akhir (Sumatif)</td>
+                          <td className="text-center">{state.generatedContent.assessments.final.technique}</td>
+                          <td>{state.generatedContent.assessments.final.instrument}</td>
+                          <td className="text-justify text-sm leading-relaxed">{state.generatedContent.assessments.final.rubric}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
                     <div className="page-break"></div>
-                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-10">5. SOAL FORMATIF HOTS</div>
+                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-10">6. SOAL FORMATIF HOTS (20 SOAL)</div>
                     <table className="table-spreadsheet">
                       <tbody>{state.generatedContent.formativeQuestions.map((q, qIdx) => (
                         <tr key={qIdx}>
-                          <td className="text-center font-bold">{qIdx + 1}</td>
-                          <td className="p-4">
-                            <p className="font-bold mb-2">{q.question}</p>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <span>A. {q.options.a}</span><span>B. {q.options.b}</span>
-                              <span>C. {q.options.c}</span><span>D. {q.options.d}</span>
+                          <td className="text-center font-bold bg-slate-50" style={{width: '40px'}}>{qIdx + 1}</td>
+                          <td className="p-6">
+                            <p className="font-bold mb-4 leading-relaxed">{q.question}</p>
+                            <div className="grid grid-cols-2 gap-4 text-sm font-medium">
+                              <div className="flex gap-2"><span>A.</span><span>{q.options.a}</span></div>
+                              <div className="flex gap-2"><span>B.</span><span>{q.options.b}</span></div>
+                              <div className="flex gap-2"><span>C.</span><span>{q.options.c}</span></div>
+                              <div className="flex gap-2"><span>D.</span><span>{q.options.d}</span></div>
                             </div>
                           </td>
                         </tr>
                       ))}</tbody>
                     </table>
 
-                    <table className="table-signatures mt-20">
+                    <table className="table-signatures mt-24">
                       <tbody>
                         <tr>
                           <td>
-                            <p className="font-bold mb-20 uppercase">Kepala Sekolah</p>
-                            <p className="font-bold underline">{state.formData.principalName}</p>
-                            <p>NIP. {state.formData.principalNip}</p>
+                            <p className="mb-2">Mengetahui,</p>
+                            <p className="font-bold mb-24 uppercase">Kepala Sekolah</p>
+                            <p className="font-bold underline text-lg">{state.formData.principalName}</p>
+                            <p className="text-sm">NIP. {state.formData.principalNip}</p>
                           </td>
                           <td>
-                            <p className="font-bold mb-20 uppercase">Guru Kelas</p>
-                            <p className="font-bold underline">{state.formData.teacherName}</p>
-                            <p>NIP. {state.formData.teacherNip}</p>
+                            <p className="mb-2">Andopan, .................... 2026</p>
+                            <p className="font-bold mb-24 uppercase">Guru Kelas</p>
+                            <p className="font-bold underline text-lg">{state.formData.teacherName}</p>
+                            <p className="text-sm">NIP. {state.formData.teacherNip}</p>
                           </td>
                         </tr>
                       </tbody>

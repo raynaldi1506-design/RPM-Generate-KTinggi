@@ -26,7 +26,7 @@
             width: 100%;
             overflow-x: auto;
             background: #cbd5e1;
-            padding: 40px 20px;
+            padding: 20px;
             border-radius: 2rem;
             display: flex;
             justify-content: flex-start;
@@ -37,6 +37,7 @@
         @media (min-width: 1024px) {
             .f4-preview-wrapper {
                 justify-content: center;
+                padding: 40px 20px;
             }
         }
 
@@ -51,11 +52,11 @@
         .f4-page {
             width: 210mm;
             min-height: 330mm;
-            padding: 10mm;
+            padding: 15mm 10mm;
             background: white;
             font-family: 'Times New Roman', Times, serif;
             font-size: 11pt;
-            line-height: 1.4;
+            line-height: 1.5;
             color: black !important;
             box-sizing: border-box;
             position: relative;
@@ -66,29 +67,33 @@
             box-sizing: border-box;
         }
 
+        /* Optimized Table Styles */
         .table-spreadsheet {
             width: 100% !important;
             border-collapse: collapse !important;
-            table-layout: auto !important;
+            table-layout: auto !important; /* Changed to auto for better responsiveness */
             border: 1.5pt solid black !important;
             margin-bottom: 12pt;
+            word-break: normal;
         }
 
         .table-spreadsheet td, .table-spreadsheet th {
             border: 1pt solid black !important;
-            padding: 6pt 8pt !important;
+            padding: 8pt 10pt !important;
             vertical-align: top !important;
             text-align: left;
-            word-wrap: break-word !important;
             overflow-wrap: break-word !important;
+            word-wrap: break-word !important;
+            hyphens: auto;
             font-size: 10.5pt !important;
+            line-height: 1.4;
         }
 
         .table-signatures {
             width: 100% !important;
             border-collapse: collapse !important;
             border: none !important;
-            margin-top: 30pt;
+            margin-top: 40pt;
         }
 
         .table-signatures td {
@@ -99,7 +104,6 @@
             padding: 0 !important;
         }
 
-        /* Styling for Answer Key Table (Stable for Word/PDF) */
         .table-answer-key {
             width: 100% !important;
             border-collapse: collapse !important;
@@ -115,10 +119,10 @@
         }
 
         .col-key {
-            width: 55mm !important;
-            min-width: 40mm;
+            width: 45mm !important; /* Adjusted for better balance */
+            min-width: 35mm;
             font-weight: bold;
-            background-color: #f1f5f9 !important;
+            background-color: #f8fafc !important;
         }
 
         .table-header-pink {
@@ -126,7 +130,7 @@
             font-weight: bold;
             text-align: center !important;
             text-transform: uppercase;
-            padding: 10pt !important;
+            padding: 12pt !important;
             font-size: 11pt !important;
             border: 1.5pt solid black !important;
         }
@@ -145,14 +149,14 @@
 
         .meeting-badge {
             display: inline-block;
-            padding: 4pt 12pt;
+            padding: 6pt 14pt;
             background: #1e1b4b;
             color: white !important;
             font-weight: bold;
             text-transform: uppercase;
             font-size: 9pt;
-            margin-bottom: 8pt;
-            border-radius: 4px;
+            margin-bottom: 10pt;
+            border-radius: 6px;
         }
 
         /* Print Settings Improved */
