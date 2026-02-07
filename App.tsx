@@ -45,7 +45,8 @@ import {
   Square,
   Info,
   PenTool,
-  BookMarked
+  BookMarked,
+  Eye
 } from 'lucide-react';
 
 const TEACHERS = [
@@ -117,11 +118,34 @@ export default function App() {
   const [promesData, setPromesData] = useState<PromesEntry[] | null>(null);
   const [isGeneratingExtra, setIsGeneratingExtra] = useState(false);
 
+  // Load persistence data on mount
   useEffect(() => {
-    const saved = localStorage.getItem('rpm_library');
-    if (saved) setLibrary(JSON.parse(saved));
+    const savedFormData = localStorage.getItem('rpm_form_data');
+    if (savedFormData) {
+      try {
+        const parsed = JSON.parse(savedFormData);
+        setState(prev => ({ ...prev, formData: { ...INITIAL_FORM, ...parsed } }));
+      } catch (e) {
+        console.error("Failed to parse saved form data", e);
+      }
+    }
+
+    const savedLibrary = localStorage.getItem('rpm_library');
+    if (savedLibrary) {
+      try {
+        setLibrary(JSON.parse(savedLibrary));
+      } catch (e) {
+        console.error("Failed to parse saved library", e);
+      }
+    }
   }, []);
 
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('rpm_form_data', JSON.stringify(state.formData));
+  }, [state.formData]);
+
+  // Save library separately
   useEffect(() => {
     localStorage.setItem('rpm_library', JSON.stringify(library));
   }, [library]);
@@ -158,7 +182,6 @@ export default function App() {
         try {
           const result = await pregenerateCPandTP(state.formData.subject, state.formData.material, state.formData.grade);
           
-          // Improved Mapping logic for Enums
           const allDimensions = Object.values(GraduateDimension);
           const autoDimensions = (result.dimensions || []).map((d: string) => {
             return allDimensions.find(v => 
@@ -179,8 +202,8 @@ export default function App() {
             ...prev,
             formData: {
               ...prev.formData,
-              cp: result.cp || "",
-              tp: (result.tp || []).map((t: string, i: number) => `${i + 1}. ${t}`).join("\n"),
+              cp: result.cp || prev.formData.cp,
+              tp: result.tp ? (result.tp || []).map((t: string, i: number) => `${i + 1}. ${t}`).join("\n") : prev.formData.tp,
               dimensions: autoDimensions.length > 0 ? autoDimensions : prev.formData.dimensions,
               pedagogy: autoPedagogy.length > 0 ? autoPedagogy : prev.formData.pedagogy,
               meetingCount: result.suggestedMeetings || prev.formData.meetingCount
@@ -192,7 +215,10 @@ export default function App() {
         }
       }
     };
-    triggerPrefill();
+    const isActuallyEmpty = !state.formData.cp && !state.formData.tp;
+    if (isActuallyEmpty) {
+       triggerPrefill();
+    }
   }, [state.formData.material, state.formData.subject, state.formData.grade]);
 
   const handleGenerateNewTopics = async () => {
@@ -237,7 +263,7 @@ export default function App() {
   const handleTopicSelect = (topic: string) => {
     setState(prev => ({
       ...prev,
-      formData: { ...prev.formData, material: topic }
+      formData: { ...prev.formData, material: topic, cp: "", tp: "" }
     }));
     setTopicSearchQuery(topic);
     setIsComboboxOpen(false);
@@ -276,18 +302,33 @@ export default function App() {
     finally { setIsGeneratingExtra(false); }
   };
 
-  const downloadDocument = (elementId: string, filename: string, type: 'pdf' | 'word') => {
+  const resetForm = () => {
+    if (confirm("Apakah Anda yakin ingin menghapus semua input dan mereset form?")) {
+      localStorage.removeItem('rpm_form_data');
+      setState(prev => ({ ...prev, formData: INITIAL_FORM, generatedContent: null, generatedImageUrl: null }));
+    }
+  };
+
+  const downloadDocument = (elementId: string, filename: string, type: 'pdf' | 'word' | 'preview') => {
     const element = document.getElementById(elementId);
     if (!element) return;
-    if (type === 'pdf') {
-      const opt = {
-        margin: 0,
-        filename: `${filename}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF: { unit: 'mm', format: [210, 330], orientation: 'portrait' }
-      };
-      html2pdf().set(opt).from(element).save();
+    
+    const opt = {
+      margin: 0,
+      filename: `${filename}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: [210, 330], orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    };
+
+    if (type === 'preview') {
+      // Menggunakan API output('bloburl') untuk membuka tab baru secara langsung
+      html2pdf().from(element).set(opt).output('bloburl').then((url: string) => {
+        window.open(url, '_blank');
+      });
+    } else if (type === 'pdf') {
+      html2pdf().from(element).set(opt).save();
     } else {
       const html = `
         <html><head><meta charset='utf-8'><style>
@@ -303,7 +344,7 @@ export default function App() {
           .table-signatures td { text-align: center; width: 50%; border: none !important; }
           .table-answer-key { width: 100%; border-collapse: collapse; border: 1pt solid black; }
           .table-answer-key td { border: 1pt solid black; padding: 4pt; text-align: center; font-weight: bold; width: 20%; }
-          @page { size: 210mm 330mm; margin: 20mm; }
+          @page { size: 210mm 330mm; margin: 10mm; }
         </style></head><body>${element.innerHTML}</body></html>`;
       const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
       const link = document.createElement('a');
@@ -313,8 +354,9 @@ export default function App() {
     }
   };
 
-  const handleDownloadWord = () => downloadDocument('rpm-print-area', `RPM_${state.formData.subject}_${state.formData.grade}`, 'word');
-  const handleDownloadPDF = () => downloadDocument('rpm-print-area', `RPM_${state.formData.subject}_${state.formData.grade}`, 'pdf');
+  const handleDownloadWord = () => downloadDocument('rpm-page-container', `RPM_${state.formData.subject}_${state.formData.grade}`, 'word');
+  const handleDownloadPDF = () => downloadDocument('rpm-page-container', `RPM_${state.formData.subject}_${state.formData.grade}`, 'pdf');
+  const handlePrintPreview = () => downloadDocument('rpm-page-container', `RPM_${state.formData.subject}_${state.formData.grade}`, 'preview');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -336,9 +378,14 @@ export default function App() {
               </span>
             </div>
           </div>
-          <button onClick={() => setShowLibrary(true)} className="flex items-center gap-2 px-8 py-3 bg-indigo-700 hover:bg-indigo-600 rounded-2xl font-black text-sm transition-all shadow-lg active:scale-95 group">
-            <Library size={18} className="group-hover:rotate-12 transition-transform" /> PUSTAKA CP/TP
-          </button>
+          <div className="flex gap-2">
+            <button onClick={resetForm} className="flex items-center gap-2 px-6 py-3 bg-rose-700/50 hover:bg-rose-600 rounded-2xl font-black text-xs transition-all border border-rose-500/30">
+              <Trash2 size={16} /> RESET DATA
+            </button>
+            <button onClick={() => setShowLibrary(true)} className="flex items-center gap-2 px-8 py-3 bg-indigo-700 hover:bg-indigo-600 rounded-2xl font-black text-sm transition-all shadow-lg active:scale-95 group">
+              <Library size={18} className="group-hover:rotate-12 transition-transform" /> PUSTAKA
+            </button>
+          </div>
         </div>
       </header>
 
@@ -416,10 +463,13 @@ export default function App() {
               <h2 className="text-xl font-black text-white uppercase flex items-center gap-3">
                 <PenTool size={24} className="text-indigo-300" /> Input Data RPM
               </h2>
+              <div className="flex gap-2">
+                <span className="bg-emerald-500 w-3 h-3 rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Auto-Save On</span>
+              </div>
             </div>
             
             <form onSubmit={handleSubmit} className="p-10 space-y-10 max-h-[75vh] overflow-y-auto custom-scrollbar">
-              {/* Identitas Umum */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
                   <Info className="text-indigo-600" size={18} />
@@ -455,7 +505,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Topik & Materi */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
                   <BookMarked className="text-indigo-600" size={18} />
@@ -496,7 +545,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* CP, TP, Pedagogi, Dimensi */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
                   <Layout className="text-indigo-600" size={18} />
@@ -519,7 +567,6 @@ export default function App() {
                       <textarea name="tp" value={state.formData.tp} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-medium text-sm h-32 outline-none focus:border-indigo-500 bg-slate-50/50 resize-none custom-scrollbar"></textarea>
                     </div>
 
-                    {/* Pedagogis Checkboxes */}
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-slate-400 uppercase block">Praktik Pedagogis (Otomatis)</label>
                       <div className="grid grid-cols-1 gap-2">
@@ -531,7 +578,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Dimensi Checkboxes */}
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-slate-400 uppercase block">Dimensi Profil Lulusan (Otomatis)</label>
                       <div className="grid grid-cols-2 gap-2">
@@ -546,7 +592,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* Tanda Tangan */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
                   <UserCircle className="text-indigo-600" size={18} />
@@ -567,7 +612,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* Preview Column */}
         <section className="lg:col-span-8 xl:col-span-8 space-y-10">
           {state.generatedContent ? (
             <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -584,16 +628,15 @@ export default function App() {
                 <div className="flex gap-4">
                   <button onClick={handleDownloadWord} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all">WORD</button>
                   <button onClick={handleDownloadPDF} className="bg-rose-600 hover:bg-rose-700 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all">PDF</button>
-                  <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all flex items-center gap-2"><Printer size={18} /> CETAK</button>
+                  <button onClick={handlePrintPreview} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all flex items-center gap-2"><Eye size={18} /> PRINT PREVIEW PDF</button>
                 </div>
               </div>
 
-              <div id="rpm-print-area" className="f4-preview-wrapper shadow-2xl rounded-[3rem] p-12 bg-slate-300/50">
-                <div className="f4-page-container">
+              <div className="f4-preview-wrapper shadow-2xl rounded-[3rem] p-12 bg-slate-300/50">
+                <div id="rpm-page-container" className="f4-page-container">
                   <div className="f4-page">
                     <h2 className="text-center text-xl font-bold mb-10 underline uppercase tracking-tight">RENCANA PEMBELAJARAN MENDALAM (RPM)</h2>
                     
-                    {/* 1. Identitas Pembelajaran */}
                     <table className="table-spreadsheet">
                       <thead><tr><th colSpan={2} className="table-header-pink">1. IDENTITAS PEMBELAJARAN</th></tr></thead>
                       <tbody>
@@ -606,7 +649,6 @@ export default function App() {
                       </tbody>
                     </table>
 
-                    {/* 2. Desain Pembelajaran */}
                     <table className="table-spreadsheet">
                       <thead><tr><th colSpan={2} className="table-header-pink">2. DESAIN PEMBELAJARAN</th></tr></thead>
                       <tbody>
@@ -619,7 +661,6 @@ export default function App() {
                       </tbody>
                     </table>
 
-                    {/* 3. Pengalaman Belajar */}
                     <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-8">3. PENGALAMAN BELAJAR (PEMBELAJARAN MENDALAM)</div>
                     {state.generatedContent.meetings.map((meeting, idx) => (
                       <div key={idx} className="mb-10">
@@ -643,7 +684,6 @@ export default function App() {
 
                     <div className="page-break"></div>
 
-                    {/* 4. Asesmen */}
                     <table className="table-spreadsheet mt-10">
                       <thead><tr><th colSpan={4} className="table-header-pink">4. ASESMEN PEMBELAJARAN</th></tr></thead>
                       <tr className="bg-gray-100 font-bold text-center">
@@ -656,7 +696,6 @@ export default function App() {
                       </tbody>
                     </table>
 
-                    {/* 5. Ringkasan Materi */}
                     <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-12">5. RINGKASAN MATERI POKOK</div>
                     <table className="table-spreadsheet">
                       <tbody>
@@ -684,7 +723,6 @@ export default function App() {
 
                     <div className="page-break"></div>
 
-                    {/* 7. LKPD */}
                     <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-10">7. LEMBAR KERJA PESERTA DIDIK (LKPD)</div>
                     <div className="border-[1.5pt] border-black p-12 min-h-[160mm]">
                       <h3 className="text-center font-bold underline uppercase mb-10 text-lg">LKPD: {state.formData.material}</h3>
@@ -695,7 +733,6 @@ export default function App() {
 
                     <div className="page-break"></div>
 
-                    {/* 8. Soal Formatif */}
                     <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-10 mt-10">8. SOAL FORMATIF (HOTS) & KUNCI</div>
                     <table className="table-spreadsheet">
                       <thead><tr className="bg-gray-100 text-center font-bold"><th style={{width: '40px'}}>No</th><th>Butir Soal & Pilihan Jawaban</th></tr></thead>
@@ -723,7 +760,6 @@ export default function App() {
 
                     <div className="mt-12">
                       <p className="font-bold underline text-center uppercase mb-6 text-base">KUNCI JAWABAN</p>
-                      {/* Using a robust HTML table for the answer key to prevent layout breakage on download */}
                       <table className="table-answer-key">
                         <tbody>
                           {[0, 5, 10, 15].map(rowStart => (
@@ -739,7 +775,6 @@ export default function App() {
                       </table>
                     </div>
 
-                    {/* 6. Tanda Tangan */}
                     <table className="table-signatures">
                       <tbody>
                         <tr>

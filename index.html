@@ -51,7 +51,7 @@
         .f4-page {
             width: 210mm;
             min-height: 330mm;
-            padding: 20mm 15mm;
+            padding: 10mm;
             background: white;
             font-family: 'Times New Roman', Times, serif;
             font-size: 11pt;
@@ -69,7 +69,7 @@
         .table-spreadsheet {
             width: 100% !important;
             border-collapse: collapse !important;
-            table-layout: fixed !important;
+            table-layout: auto !important;
             border: 1.5pt solid black !important;
             margin-bottom: 12pt;
         }
@@ -116,6 +116,7 @@
 
         .col-key {
             width: 55mm !important;
+            min-width: 40mm;
             font-weight: bold;
             background-color: #f1f5f9 !important;
         }
@@ -154,14 +155,48 @@
             border-radius: 4px;
         }
 
-        /* Print Settings */
+        /* Print Settings Improved */
         @media print {
-            body { background: white !important; margin: 0 !important; padding: 0 !important; }
+            html, body {
+                width: 210mm !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             .no-print { display: none !important; }
-            .f4-preview-wrapper { padding: 0 !important; background: white !important; overflow: visible !important; display: block !important; border-radius: 0 !important; }
-            .f4-page-container { box-shadow: none !important; margin: 0 !important; width: 210mm !important; }
-            .f4-page { padding: 15mm !important; width: 210mm !important; border: none !important; }
-            @page { size: 210mm 330mm; margin: 0; }
+            #root { width: 100% !important; display: block !important; }
+            main { display: block !important; margin: 0 !important; padding: 0 !important; }
+            section { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            
+            .f4-preview-wrapper { 
+                padding: 0 !important; 
+                background: white !important; 
+                overflow: visible !important; 
+                display: block !important; 
+                border-radius: 0 !important; 
+                box-shadow: none !important;
+                width: 210mm !important;
+            }
+            .f4-page-container { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                width: 210mm !important; 
+                display: block !important;
+            }
+            .f4-page { 
+                padding: 10mm !important; 
+                width: 210mm !important; 
+                border: none !important; 
+                margin: 0 !important;
+                box-shadow: none !important;
+            }
+            @page { 
+                size: 210mm 330mm; 
+                margin: 0; 
+            }
         }
 
         /* Custom Scrollbar for Form */
