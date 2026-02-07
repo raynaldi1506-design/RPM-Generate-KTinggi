@@ -17,7 +17,8 @@ import {
   pregenerateCPandTP, 
   getAITopics,
   generateProta,
-  generatePromes
+  generatePromes,
+  ChapterInfo
 } from './services/geminiService';
 import { 
   Printer, 
@@ -46,7 +47,8 @@ import {
   Info,
   PenTool,
   BookMarked,
-  Eye
+  Eye,
+  FileText
 } from 'lucide-react';
 
 const TEACHERS = [
@@ -104,7 +106,7 @@ export default function App() {
     error: null
   });
 
-  const [aiTopics, setAiTopics] = useState<string[]>([]);
+  const [aiTopics, setAiTopics] = useState<ChapterInfo[]>([]);
   const [isFetchingTopics, setIsFetchingTopics] = useState(false);
   const [topicSearchQuery, setTopicSearchQuery] = useState("");
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
@@ -112,43 +114,24 @@ export default function App() {
   
   const [library, setLibrary] = useState<LibraryEntry[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
-  const [searchKeyword, setSearchKeyword] = useState("");
 
   const [protaData, setProtaData] = useState<ProtaEntry[] | null>(null);
   const [promesData, setPromesData] = useState<PromesEntry[] | null>(null);
   const [isGeneratingExtra, setIsGeneratingExtra] = useState(false);
 
-  // Load persistence data on mount
   useEffect(() => {
     const savedFormData = localStorage.getItem('rpm_form_data');
     if (savedFormData) {
       try {
         const parsed = JSON.parse(savedFormData);
         setState(prev => ({ ...prev, formData: { ...INITIAL_FORM, ...parsed } }));
-      } catch (e) {
-        console.error("Failed to parse saved form data", e);
-      }
-    }
-
-    const savedLibrary = localStorage.getItem('rpm_library');
-    if (savedLibrary) {
-      try {
-        setLibrary(JSON.parse(savedLibrary));
-      } catch (e) {
-        console.error("Failed to parse saved library", e);
-      }
+      } catch (e) {}
     }
   }, []);
 
-  // Save form data to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('rpm_form_data', JSON.stringify(state.formData));
   }, [state.formData]);
-
-  // Save library separately
-  useEffect(() => {
-    localStorage.setItem('rpm_library', JSON.stringify(library));
-  }, [library]);
 
   useEffect(() => {
     const fetchDefaultTopics = async () => {
@@ -211,7 +194,7 @@ export default function App() {
             isPrefilling: false
           }));
         } catch (err: any) {
-          setState(prev => ({ ...prev, isPrefilling: false, error: "Gagal memproses data otomatis." }));
+          setState(prev => ({ ...prev, isPrefilling: false, error: "Gagal sinkronisasi otomatis." }));
         }
       }
     };
@@ -222,14 +205,11 @@ export default function App() {
   }, [state.formData.material, state.formData.subject, state.formData.grade]);
 
   const handleGenerateNewTopics = async () => {
-    if (!topicSearchQuery.trim()) {
-      alert("Masukkan kata kunci untuk mencari topik baru.");
-      return;
-    }
+    if (!topicSearchQuery.trim()) return;
     setIsFetchingTopics(true);
     try {
       const newTopics = await getAITopics(state.formData.subject, state.formData.grade, topicSearchQuery);
-      setAiTopics(prev => [...new Set([...newTopics, ...prev])]);
+      setAiTopics(newTopics);
       setIsComboboxOpen(true);
     } catch (err) {
       alert("Gagal menghasilkan topik baru.");
@@ -239,7 +219,12 @@ export default function App() {
   };
 
   const filteredTopics = useMemo(() => {
-    return aiTopics.filter(t => t.toLowerCase().includes(topicSearchQuery.toLowerCase()));
+    if (!topicSearchQuery) return aiTopics;
+    const query = topicSearchQuery.toLowerCase();
+    return aiTopics.map(chap => ({
+      ...chap,
+      materials: chap.materials.filter(m => m.toLowerCase().includes(query))
+    })).filter(chap => chap.materials.length > 0 || chap.title.toLowerCase().includes(query));
   }, [aiTopics, topicSearchQuery]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -260,12 +245,12 @@ export default function App() {
     });
   };
 
-  const handleTopicSelect = (topic: string) => {
+  const handleTopicSelect = (material: string) => {
     setState(prev => ({
       ...prev,
-      formData: { ...prev.formData, material: topic, cp: "", tp: "" }
+      formData: { ...prev.formData, material, cp: "", tp: "" }
     }));
-    setTopicSearchQuery(topic);
+    setTopicSearchQuery(material);
     setIsComboboxOpen(false);
   };
 
@@ -289,7 +274,7 @@ export default function App() {
     try {
       const data = await generateProta(state.formData.subject, state.formData.grade);
       setProtaData(data);
-    } catch (e) { alert("Gagal membuat Prota"); }
+    } catch (e) { alert("Gagal"); }
     finally { setIsGeneratingExtra(false); }
   };
 
@@ -298,12 +283,12 @@ export default function App() {
     try {
       const data = await generatePromes(state.formData.subject, state.formData.grade, 2);
       setPromesData(data);
-    } catch (e) { alert("Gagal membuat Promes"); }
+    } catch (e) { alert("Gagal"); }
     finally { setIsGeneratingExtra(false); }
   };
 
   const resetForm = () => {
-    if (confirm("Apakah Anda yakin ingin menghapus semua input dan mereset form?")) {
+    if (confirm("Reset data form?")) {
       localStorage.removeItem('rpm_form_data');
       setState(prev => ({ ...prev, formData: INITIAL_FORM, generatedContent: null, generatedImageUrl: null }));
     }
@@ -323,29 +308,13 @@ export default function App() {
     };
 
     if (type === 'preview') {
-      // Menggunakan API output('bloburl') untuk membuka tab baru secara langsung
       html2pdf().from(element).set(opt).output('bloburl').then((url: string) => {
         window.open(url, '_blank');
       });
     } else if (type === 'pdf') {
       html2pdf().from(element).set(opt).save();
     } else {
-      const html = `
-        <html><head><meta charset='utf-8'><style>
-          body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: black; }
-          table { border-collapse: collapse; width: 100%; border: 1.5pt solid black; }
-          td, th { border: 1pt solid black; padding: 6pt; vertical-align: top; text-align: left; }
-          .whitespace-pre-line { white-space: pre-line; }
-          .bg-header { background-color: #fce4ec; font-weight: bold; }
-          .text-center { text-align: center; }
-          .font-bold { font-weight: bold; }
-          .uppercase { text-transform: uppercase; }
-          .underline { text-decoration: underline; }
-          .table-signatures td { text-align: center; width: 50%; border: none !important; }
-          .table-answer-key { width: 100%; border-collapse: collapse; border: 1pt solid black; }
-          .table-answer-key td { border: 1pt solid black; padding: 4pt; text-align: center; font-weight: bold; width: 20%; }
-          @page { size: 210mm 330mm; margin: 10mm; }
-        </style></head><body>${element.innerHTML}</body></html>`;
+      const html = `<html><body style="font-family:'Times New Roman'">${element.innerHTML}</body></html>`;
       const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -354,12 +323,8 @@ export default function App() {
     }
   };
 
-  const handleDownloadWord = () => downloadDocument('rpm-page-container', `RPM_${state.formData.subject}_${state.formData.grade}`, 'word');
-  const handleDownloadPDF = () => downloadDocument('rpm-page-container', `RPM_${state.formData.subject}_${state.formData.grade}`, 'pdf');
-  const handlePrintPreview = () => downloadDocument('rpm-page-container', `RPM_${state.formData.subject}_${state.formData.grade}`, 'preview');
-
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
       <header className="bg-indigo-950 text-white py-5 px-6 no-print shadow-xl sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center gap-6">
           <div className="flex items-center gap-4 shrink-0">
@@ -389,10 +354,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* MODALS for PROTA/PROMES/LIBRARY */}
+      {/* MODALS for PROTA/PROMES */}
       {(protaData || promesData) && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-indigo-950/80 backdrop-blur-md p-4 no-print">
-          <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl border border-white/20">
+          <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl">
             <div className="bg-indigo-900 p-8 flex justify-between items-center text-white">
                <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
                  <ClipboardList size={28} /> {protaData ? "Program Tahunan" : "Program Semester"}
@@ -403,7 +368,7 @@ export default function App() {
                <div id="extra-print-area" className="bg-white p-12 shadow-md border border-slate-200 mx-auto max-w-[210mm]">
                   {protaData ? (
                     <>
-                      <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM TAHUNAN (PROTA)</h2>
+                      <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM TAHUNAN (PROTA) 2025/2026</h2>
                       <table className="table-spreadsheet">
                         <thead><tr className="table-header-pink"><th>No</th><th>Semester</th><th>Materi Pokok</th><th>Alokasi JP</th></tr></thead>
                         <tbody>{protaData.map((item, idx) => (
@@ -413,7 +378,7 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM SEMESTER (PROMES)</h2>
+                      <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM SEMESTER (PROMES) GENAP 2026</h2>
                       <table className="table-spreadsheet">
                         <thead>
                           <tr className="bg-indigo-900 text-white text-center">
@@ -437,14 +402,14 @@ export default function App() {
                </div>
             </div>
             <div className="p-8 border-t bg-white flex justify-end gap-4">
-               <button onClick={() => downloadDocument('extra-print-area', 'Dokumen_Administrasi', 'word')} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg hover:bg-blue-700 transition-colors">WORD</button>
-               <button onClick={() => downloadDocument('extra-print-area', 'Dokumen_Administrasi', 'pdf')} className="bg-rose-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg hover:bg-rose-700 transition-colors">PDF</button>
+               <button onClick={() => downloadDocument('extra-print-area', 'Administrasi', 'word')} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg">WORD</button>
+               <button onClick={() => downloadDocument('extra-print-area', 'Administrasi', 'pdf')} className="bg-rose-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg">PDF</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* CUSTOM MARQUEE MERAH PUTIH */}
+      {/* MARQUEE */}
       <div className="no-print mx-auto max-w-[1700px] w-full px-6 mt-4">
         <div className="marquee-container bg-red-600 rounded-2xl py-3 border-4 border-white shadow-2xl overflow-hidden">
           <div className="animate-marquee inline-block whitespace-nowrap px-8">
@@ -456,134 +421,133 @@ export default function App() {
       </div>
 
       <main className="max-w-[1700px] mx-auto w-full px-6 mt-10 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-12">
-        {/* Form Column */}
+        {/* FORM SECTION */}
         <section className="lg:col-span-4 xl:col-span-4 no-print space-y-8 pb-12">
           <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden sticky top-32">
-            <div className="bg-indigo-800 px-10 py-8 flex justify-between items-center border-b border-indigo-900/10">
+            <div className="bg-indigo-800 px-10 py-8 border-b border-indigo-900/10">
               <h2 className="text-xl font-black text-white uppercase flex items-center gap-3">
                 <PenTool size={24} className="text-indigo-300" /> Input Data RPM
               </h2>
-              <div className="flex gap-2">
-                <span className="bg-emerald-500 w-3 h-3 rounded-full animate-pulse"></span>
-                <span className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">Auto-Save On</span>
-              </div>
             </div>
             
             <form onSubmit={handleSubmit} className="p-10 space-y-10 max-h-[75vh] overflow-y-auto custom-scrollbar">
+              {/* SUBJECT & GRADE */}
               <div className="space-y-6">
-                <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
-                  <Info className="text-indigo-600" size={18} />
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Identitas Umum</span>
-                </div>
-                
                 <div className="grid grid-cols-2 gap-6">
                   <div className="col-span-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Mata Pelajaran</label>
-                    <select name="subject" value={state.formData.subject} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50 outline-none focus:border-indigo-500 transition-all cursor-pointer">
+                    <select name="subject" value={state.formData.subject} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50 focus:border-indigo-500 transition-all">
                       {SD_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Kelas</label>
-                    <select name="grade" value={state.formData.grade} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50 outline-none focus:border-indigo-500 transition-all cursor-pointer">
+                    <select name="grade" value={state.formData.grade} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50">
                       {SD_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Jml Pertemuan</label>
-                    <input type="number" name="meetingCount" value={state.formData.meetingCount} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50 outline-none focus:border-indigo-500 transition-all" min="1" max="10"/>
+                    <input type="number" name="meetingCount" value={state.formData.meetingCount} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold bg-slate-50" min="1" max="10"/>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <button type="button" onClick={handleGenProta} className="flex-1 py-4 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all active:scale-95 shadow-sm">
-                    <ClipboardList size={16}/> GENERATE PROTA
+                  <button type="button" onClick={handleGenProta} className="py-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-2xl font-black text-xs flex items-center justify-center gap-2">
+                    <ClipboardList size={16}/> PROTA
                   </button>
-                  <button type="button" onClick={handleGenPromes} className="flex-1 py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all active:scale-95 shadow-sm">
-                    <Calendar size={16}/> GENERATE PROMES
+                  <button type="button" onClick={handleGenPromes} className="py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-xs flex items-center justify-center gap-2">
+                    <Calendar size={16}/> PROMES
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
-                  <BookMarked className="text-indigo-600" size={18} />
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Materi & Topik</span>
-                </div>
-                
-                <div className="space-y-4" ref={comboboxRef}>
-                  <label className="text-[10px] font-black text-indigo-700 uppercase flex items-center gap-2">
-                    Cari Topik Semester 2 {isFetchingTopics && <Loader2 className="animate-spin" size={12}/>}
-                  </label>
-                  <div className="relative">
+              {/* TOPIK/MATERI DROPDOWN (DETAIL) */}
+              <div className="space-y-6" ref={comboboxRef}>
+                <label className="text-[10px] font-black text-indigo-700 uppercase flex items-center gap-2 mb-2">
+                  Pilih Bab & Materi Pokok (Smt 2) {isFetchingTopics && <Loader2 className="animate-spin" size={12}/>}
+                </label>
+                <div className="relative">
                     <div className="flex items-center border-2 border-indigo-200 rounded-2xl bg-indigo-50/30 overflow-hidden focus-within:border-indigo-500 transition-all shadow-sm">
                        <Search className="ml-4 text-indigo-400" size={18} />
                        <input 
-                         type="text" placeholder="Masukkan materi atau kata kunci..." 
+                         type="text" placeholder="Cari materi pokok..." 
                          value={topicSearchQuery}
                          onChange={(e) => { setTopicSearchQuery(e.target.value); setIsComboboxOpen(true); }}
                          onFocus={() => setIsComboboxOpen(true)}
                          className="flex-1 p-4 font-bold outline-none bg-transparent"
                        />
-                       <button type="button" onClick={() => setIsComboboxOpen(!isComboboxOpen)} className="px-4 text-indigo-500 hover:bg-indigo-100 transition-colors border-l border-indigo-200">
-                         <ChevronDown size={20} />
-                       </button>
                     </div>
                     {isComboboxOpen && (
-                      <div className="absolute z-[60] left-0 right-0 mt-3 bg-white border-2 border-indigo-200 rounded-3xl shadow-2xl max-h-[300px] overflow-y-auto">
-                        {filteredTopics.map((topic, i) => (
-                          <div key={i} onClick={() => handleTopicSelect(topic)} className="p-4 hover:bg-indigo-50 cursor-pointer border-b border-indigo-50 last:border-0 font-bold text-slate-700 transition-colors flex items-center gap-3">
-                            <BookOpen size={16} className="text-indigo-400 shrink-0" /> {topic}
+                      <div className="absolute z-[60] left-0 right-0 mt-3 bg-white border-2 border-indigo-200 rounded-3xl shadow-2xl max-h-[350px] overflow-y-auto custom-scrollbar">
+                        {filteredTopics.length > 0 ? filteredTopics.map((chap, i) => (
+                          <div key={i} className="border-b border-indigo-50 last:border-0">
+                             <div className="bg-indigo-900/5 px-6 py-3 font-black text-indigo-900 text-xs uppercase flex items-center gap-2">
+                                <BookMarked size={14}/> {chap.chapter}: {chap.title}
+                             </div>
+                             <div className="py-2">
+                               {chap.materials.map((mat, j) => (
+                                 <div 
+                                   key={j} 
+                                   onClick={() => handleTopicSelect(mat)}
+                                   className="px-10 py-3 hover:bg-indigo-50 cursor-pointer text-sm font-bold text-slate-700 flex items-center gap-3 transition-colors"
+                                 >
+                                   <FileText size={14} className="text-slate-400" /> {mat}
+                                 </div>
+                               ))}
+                             </div>
                           </div>
-                        ))}
-                        <div className="p-4 bg-indigo-50 sticky bottom-0 border-t border-indigo-100">
-                           <button type="button" onClick={handleGenerateNewTopics} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-md">GENERATE TOPIK BARU</button>
-                        </div>
+                        )) : (
+                          <div className="p-10 text-center space-y-4">
+                             <p className="text-sm font-bold text-slate-400 uppercase">Materi tidak ditemukan</p>
+                             <button type="button" onClick={handleGenerateNewTopics} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase shadow-md">Buat Rincian Khusus</button>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
                 </div>
               </div>
 
+              {/* CURRICULUM FIELDS */}
               <div className="space-y-6">
                 <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
                   <Layout className="text-indigo-600" size={18} />
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Desain Pembelajaran (Otomatis)</span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Desain Pembelajaran</span>
                 </div>
                 
                 {state.isPrefilling ? (
-                  <div className="p-10 bg-indigo-50 rounded-3xl text-center border-2 border-indigo-100 space-y-4 animate-pulse">
-                    <Loader2 className="animate-spin mx-auto text-indigo-600" size={32} />
-                    <p className="text-xs font-black text-indigo-800 uppercase tracking-widest">Sinkronisasi Kurikulum 2025...</p>
+                  <div className="p-10 bg-indigo-50 rounded-3xl text-center border-2 border-indigo-100 animate-pulse">
+                    <Loader2 className="animate-spin mx-auto text-indigo-600 mb-4" size={32} />
+                    <p className="text-xs font-black text-indigo-800 uppercase tracking-widest">Memproses Silabus 2026...</p>
                   </div>
                 ) : (
-                  <div className="space-y-8 animate-in fade-in duration-500">
+                  <div className="space-y-8">
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Capaian Pembelajaran (CP)</label>
-                      <textarea name="cp" value={state.formData.cp} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-medium text-sm h-32 outline-none focus:border-indigo-500 bg-slate-50/50 resize-none custom-scrollbar"></textarea>
+                      <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">CP</label>
+                      <textarea name="cp" value={state.formData.cp} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl text-sm h-32 bg-slate-50 resize-none"></textarea>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">Tujuan Pembelajaran (TP)</label>
-                      <textarea name="tp" value={state.formData.tp} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-medium text-sm h-32 outline-none focus:border-indigo-500 bg-slate-50/50 resize-none custom-scrollbar"></textarea>
+                      <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block">TP</label>
+                      <textarea name="tp" value={state.formData.tp} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl text-sm h-32 bg-slate-50 resize-none"></textarea>
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block">Praktik Pedagogis (Otomatis)</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase block">Praktik Pedagogis</label>
                       <div className="grid grid-cols-1 gap-2">
                         {Object.values(PedagogicalPractice).map(p => (
-                          <button key={p} type="button" onClick={() => toggleCheckbox('pedagogy', p)} className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left text-[11px] font-bold ${state.formData.pedagogy.includes(p) ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
-                            {state.formData.pedagogy.includes(p) ? <CheckSquare size={16} className="shrink-0" /> : <Square size={16} className="shrink-0" />} {p}
+                          <button key={p} type="button" onClick={() => toggleCheckbox('pedagogy', p)} className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left text-[11px] font-bold ${state.formData.pedagogy.includes(p) ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                            {state.formData.pedagogy.includes(p) ? <CheckSquare size={16} /> : <Square size={16} />} {p}
                           </button>
                         ))}
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase block">Dimensi Profil Lulusan (Otomatis)</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase block">Profil Lulusan</label>
                       <div className="grid grid-cols-2 gap-2">
                         {Object.values(GraduateDimension).map(d => (
-                          <button key={d} type="button" onClick={() => toggleCheckbox('dimensions', d)} className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left text-[10px] font-bold ${state.formData.dimensions.includes(d) ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
-                            {state.formData.dimensions.includes(d) ? <CheckSquare size={14} className="shrink-0" /> : <Square size={14} className="shrink-0" />} {d}
+                          <button key={d} type="button" onClick={() => toggleCheckbox('dimensions', d)} className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left text-[10px] font-bold ${state.formData.dimensions.includes(d) ? 'border-indigo-600 bg-indigo-50 text-indigo-900' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>
+                            {state.formData.dimensions.includes(d) ? <CheckSquare size={14} /> : <Square size={14} />} {d}
                           </button>
                         ))}
                       </div>
@@ -592,26 +556,24 @@ export default function App() {
                 )}
               </div>
 
+              {/* SIGNATORIES */}
               <div className="space-y-6">
-                <div className="flex items-center gap-2 pb-2 border-b-2 border-slate-100 mb-4">
-                  <UserCircle className="text-indigo-600" size={18} />
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Identitas Penanda Tangan</span>
-                </div>
                 <div className="grid grid-cols-1 gap-4">
-                  <input type="text" name="teacherName" placeholder="Nama Guru" value={state.formData.teacherName} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold text-sm bg-slate-50 outline-none" />
-                  <input type="text" name="teacherNip" placeholder="NIP Guru" value={state.formData.teacherNip} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl text-sm bg-slate-50 outline-none" />
-                  <input type="text" name="principalName" placeholder="Nama Kepala Sekolah" value={state.formData.principalName} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold text-sm bg-slate-50 outline-none" />
-                  <input type="text" name="principalNip" placeholder="NIP Kepala Sekolah" value={state.formData.principalNip} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl text-sm bg-slate-50 outline-none" />
+                  <input type="text" name="teacherName" placeholder="Nama Guru" value={state.formData.teacherName} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold text-sm bg-slate-50" />
+                  <input type="text" name="teacherNip" placeholder="NIP Guru" value={state.formData.teacherNip} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl text-sm bg-slate-50" />
+                  <input type="text" name="principalName" placeholder="Nama Kepala Sekolah" value={state.formData.principalName} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl font-bold text-sm bg-slate-50" />
+                  <input type="text" name="principalNip" placeholder="NIP Kepala Sekolah" value={state.formData.principalNip} onChange={handleInputChange} className="w-full p-4 border-2 border-slate-200 rounded-2xl text-sm bg-slate-50" />
                 </div>
               </div>
 
-              <button type="submit" disabled={state.isGenerating || !state.formData.material} className="w-full py-7 bg-indigo-700 text-white rounded-[2.5rem] font-black text-xl shadow-2xl hover:bg-indigo-800 disabled:bg-slate-300 transition-all flex items-center justify-center gap-4">
-                {state.isGenerating ? <Loader2 className="animate-spin" size={32} /> : "HASILKAN RPM LENGKAP"}
+              <button type="submit" disabled={state.isGenerating || !state.formData.material} className="w-full py-7 bg-indigo-700 text-white rounded-[2.5rem] font-black text-xl shadow-2xl hover:bg-indigo-800 disabled:bg-slate-300 transition-all">
+                {state.isGenerating ? <Loader2 className="animate-spin mx-auto" size={32} /> : "HASILKAN RPM LENGKAP"}
               </button>
             </form>
           </div>
         </section>
 
+        {/* PREVIEW SECTION */}
         <section className="lg:col-span-8 xl:col-span-8 space-y-10">
           {state.generatedContent ? (
             <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
@@ -626,9 +588,8 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <button onClick={handleDownloadWord} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all">WORD</button>
-                  <button onClick={handleDownloadPDF} className="bg-rose-600 hover:bg-rose-700 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all">PDF</button>
-                  <button onClick={handlePrintPreview} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl transition-all flex items-center gap-2"><Eye size={18} /> PRINT PREVIEW PDF</button>
+                  <button onClick={() => window.print()} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl flex items-center gap-2"><Eye size={18} /> PRINT PREVIEW PDF</button>
+                  <button onClick={() => downloadDocument('rpm-page-container', 'RPM', 'word')} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl">WORD</button>
                 </div>
               </div>
 
@@ -644,7 +605,6 @@ export default function App() {
                         <tr><td className="col-key">Mata Pelajaran</td><td>{state.formData.subject}</td></tr>
                         <tr><td className="col-key">Kelas / Semester</td><td>{state.formData.grade} / Semester 2 (Genap)</td></tr>
                         <tr><td className="col-key">Topik Materi Pokok</td><td className="font-bold">{state.formData.material}</td></tr>
-                        <tr><td className="col-key">Alokasi Waktu</td><td>{state.formData.duration} ({state.formData.meetingCount} Pertemuan)</td></tr>
                         <tr><td className="col-key">Tahun Pelajaran</td><td>{state.formData.academicYear}</td></tr>
                       </tbody>
                     </table>
@@ -652,143 +612,78 @@ export default function App() {
                     <table className="table-spreadsheet">
                       <thead><tr><th colSpan={2} className="table-header-pink">2. DESAIN PEMBELAJARAN</th></tr></thead>
                       <tbody>
-                        <tr><td className="col-key">Capaian Pembelajaran (CP)</td><td className="text-justify leading-relaxed">{state.formData.cp}</td></tr>
-                        <tr><td className="col-key">Tujuan Pembelajaran (TP)</td><td className="whitespace-pre-line leading-relaxed">{state.formData.tp}</td></tr>
-                        <tr><td className="col-key">Karakteristik Siswa</td><td>{state.generatedContent.students}</td></tr>
-                        <tr><td className="col-key">Kaitan Antar Mapel</td><td>{state.generatedContent.interdisciplinary}</td></tr>
+                        <tr><td className="col-key">CP</td><td className="text-justify">{state.formData.cp}</td></tr>
+                        <tr><td className="col-key">TP</td><td className="whitespace-pre-line">{state.formData.tp}</td></tr>
                         <tr><td className="col-key">Praktik Pedagogis</td><td className="font-bold">{state.generatedContent.pedagogy}</td></tr>
-                        <tr><td className="col-key">Dimensi Profil Lulusan</td><td className="font-bold">{state.generatedContent.dimensions}</td></tr>
+                        <tr><td className="col-key">Profil Lulusan</td><td className="font-bold">{state.generatedContent.dimensions}</td></tr>
                       </tbody>
                     </table>
 
-                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-8">3. PENGALAMAN BELAJAR (PEMBELAJARAN MENDALAM)</div>
+                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-8">3. PENGALAMAN BELAJAR</div>
                     {state.generatedContent.meetings.map((meeting, idx) => (
                       <div key={idx} className="mb-10">
                         <div className="meeting-badge">PERTEMUAN KE-{idx + 1}</div>
                         <table className="table-spreadsheet">
                           <tbody>
-                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center">A. PENDAHULUAN ({meeting.opening.duration})</td></tr>
+                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center uppercase">A. Pendahuluan ({meeting.opening.duration})</td></tr>
                             <tr><td colSpan={2} className="whitespace-pre-line pl-8 py-4 leading-relaxed">{meeting.opening.steps}</td></tr>
-                            
-                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center">B. KEGIATAN INTI</td></tr>
-                            <tr><td className="col-key pl-8 italic">Understand ({meeting.understand.duration})</td><td className="whitespace-pre-line px-6 py-4 leading-relaxed">{meeting.understand.steps}</td></tr>
-                            <tr><td className="col-key pl-8 italic">Apply ({meeting.apply.duration})</td><td className="whitespace-pre-line px-6 py-4 leading-relaxed">{meeting.apply.steps}</td></tr>
-                            <tr><td className="col-key pl-8 italic">Reflect ({meeting.reflect.duration})</td><td className="whitespace-pre-line px-6 py-4 leading-relaxed">{meeting.reflect.steps}</td></tr>
-                            
-                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center">C. PENUTUP ({meeting.closing.duration})</td></tr>
-                            <tr><td colSpan={2} className="whitespace-pre-line pl-8 py-4 leading-relaxed">{meeting.closing.steps}</td></tr>
+                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center uppercase">B. Kegiatan Inti</td></tr>
+                            <tr><td className="col-key pl-8 italic">Understand</td><td className="whitespace-pre-line px-6 py-4">{meeting.understand.steps}</td></tr>
+                            <tr><td className="col-key pl-8 italic">Apply</td><td className="whitespace-pre-line px-6 py-4">{meeting.apply.steps}</td></tr>
+                            <tr><td className="col-key pl-8 italic">Reflect</td><td className="whitespace-pre-line px-6 py-4">{meeting.reflect.steps}</td></tr>
+                            <tr className="bg-gray-100 font-bold"><td colSpan={2} className="text-center uppercase">C. Penutup ({meeting.closing.duration})</td></tr>
+                            <tr><td colSpan={2} className="whitespace-pre-line pl-8 py-4">{meeting.closing.steps}</td></tr>
                           </tbody>
                         </table>
                       </div>
                     ))}
 
                     <div className="page-break"></div>
-
-                    <table className="table-spreadsheet mt-10">
-                      <thead><tr><th colSpan={4} className="table-header-pink">4. ASESMEN PEMBELAJARAN</th></tr></thead>
-                      <tr className="bg-gray-100 font-bold text-center">
-                        <td className="w-[15%]">Jenis</td><td className="w-[25%]">Teknik</td><td className="w-[25%]">Instrumen</td><td>Rubrik/Kriteria</td>
-                      </tr>
-                      <tbody>
-                        <tr><td className="font-bold text-center uppercase">Awal</td><td>{state.generatedContent.assessments.initial.technique}</td><td>{state.generatedContent.assessments.initial.instrument}</td><td>{state.generatedContent.assessments.initial.rubric}</td></tr>
-                        <tr><td className="font-bold text-center uppercase">Proses</td><td>{state.generatedContent.assessments.process.technique}</td><td>{state.generatedContent.assessments.process.instrument}</td><td>{state.generatedContent.assessments.process.rubric}</td></tr>
-                        <tr><td className="font-bold text-center uppercase">Akhir</td><td>{state.generatedContent.assessments.final.technique}</td><td>{state.generatedContent.assessments.final.instrument}</td><td>{state.generatedContent.assessments.final.rubric}</td></tr>
-                      </tbody>
-                    </table>
-
-                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-12">5. RINGKASAN MATERI POKOK</div>
+                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-12">4. RINGKASAN MATERI POKOK</div>
                     <table className="table-spreadsheet">
                       <tbody>
-                        {state.generatedImageUrl ? (
-                          <tr>
-                            <td className="w-[60%] p-8 text-justify leading-relaxed whitespace-pre-line">
-                              {state.generatedContent.summary}
-                            </td>
+                        <tr>
+                          <td className="p-8 text-justify leading-relaxed whitespace-pre-line">
+                            {state.generatedContent.summary}
+                          </td>
+                          {state.generatedImageUrl && (
                             <td className="w-[40%] p-4 text-center">
-                              <div className="border border-black p-1 bg-white mb-2 shadow-sm">
-                                <img src={state.generatedImageUrl} alt="Visual Materi" className="w-full h-auto block" />
-                              </div>
-                              <p className="text-[8pt] italic text-slate-600">Media Visual: Ilustrasi {state.formData.material}</p>
+                              <img src={state.generatedImageUrl} alt="Visual" className="w-full h-auto border border-black p-1 bg-white" />
                             </td>
-                          </tr>
-                        ) : (
-                          <tr>
-                            <td className="p-10 text-justify leading-relaxed whitespace-pre-line">
-                              {state.generatedContent.summary}
-                            </td>
-                          </tr>
-                        )}
+                          )}
+                        </tr>
                       </tbody>
                     </table>
 
                     <div className="page-break"></div>
-
-                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-10">7. LEMBAR KERJA PESERTA DIDIK (LKPD)</div>
-                    <div className="border-[1.5pt] border-black p-12 min-h-[160mm]">
-                      <h3 className="text-center font-bold underline uppercase mb-10 text-lg">LKPD: {state.formData.material}</h3>
-                      <div className="whitespace-pre-line leading-loose text-justify">
-                        {state.generatedContent.lkpd}
-                      </div>
-                    </div>
-
-                    <div className="page-break"></div>
-
-                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-10 mt-10">8. SOAL FORMATIF (HOTS) & KUNCI</div>
+                    <div className="bg-[#fce4ec] border-[1.5pt] border-black text-center font-bold uppercase p-3 mb-6 mt-10">5. SOAL FORMATIF HOTS</div>
                     <table className="table-spreadsheet">
-                      <thead><tr className="bg-gray-100 text-center font-bold"><th style={{width: '40px'}}>No</th><th>Butir Soal & Pilihan Jawaban</th></tr></thead>
                       <tbody>{state.generatedContent.formativeQuestions.map((q, qIdx) => (
                         <tr key={qIdx}>
                           <td className="text-center font-bold">{qIdx + 1}</td>
-                          <td style={{padding: '12pt'}}>
-                            <p className="font-bold mb-4 leading-relaxed">{q.question}</p>
-                            <table style={{width: '100%', border: 'none'}}>
-                              <tbody>
-                                <tr>
-                                  <td style={{border: 'none', padding: '2pt', width: '50%'}}>A. {q.options.a}</td>
-                                  <td style={{border: 'none', padding: '2pt', width: '50%'}}>B. {q.options.b}</td>
-                                </tr>
-                                <tr>
-                                  <td style={{border: 'none', padding: '2pt', width: '50%'}}>C. {q.options.c}</td>
-                                  <td style={{border: 'none', padding: '2pt', width: '50%'}}>D. {q.options.d}</td>
-                                </tr>
-                              </tbody>
-                            </table>
+                          <td className="p-4">
+                            <p className="font-bold mb-2">{q.question}</p>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <span>A. {q.options.a}</span><span>B. {q.options.b}</span>
+                              <span>C. {q.options.c}</span><span>D. {q.options.d}</span>
+                            </div>
                           </td>
                         </tr>
                       ))}</tbody>
                     </table>
 
-                    <div className="mt-12">
-                      <p className="font-bold underline text-center uppercase mb-6 text-base">KUNCI JAWABAN</p>
-                      <table className="table-answer-key">
-                        <tbody>
-                          {[0, 5, 10, 15].map(rowStart => (
-                            <tr key={rowStart}>
-                              {state.generatedContent?.formativeQuestions.slice(rowStart, rowStart + 5).map((q, idx) => (
-                                <td key={idx}>
-                                  {rowStart + idx + 1}. {q.answer.toUpperCase()}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <table className="table-signatures">
+                    <table className="table-signatures mt-20">
                       <tbody>
                         <tr>
                           <td>
-                            <p className="mb-1">Mengetahui,</p>
                             <p className="font-bold mb-20 uppercase">Kepala Sekolah</p>
-                            <p className="font-bold underline text-base">{state.formData.principalName}</p>
-                            <p className="text-sm">NIP. {state.formData.principalNip}</p>
+                            <p className="font-bold underline">{state.formData.principalName}</p>
+                            <p>NIP. {state.formData.principalNip}</p>
                           </td>
                           <td>
-                            <p className="mb-1">Andopan, .................... 2026</p>
                             <p className="font-bold mb-20 uppercase">Guru Kelas</p>
-                            <p className="font-bold underline text-base">{state.formData.teacherName}</p>
-                            <p className="text-sm">NIP. {state.formData.teacherNip}</p>
+                            <p className="font-bold underline">{state.formData.teacherName}</p>
+                            <p>NIP. {state.formData.teacherNip}</p>
                           </td>
                         </tr>
                       </tbody>
@@ -802,10 +697,8 @@ export default function App() {
                <div className="bg-indigo-50 p-8 rounded-[3rem] mb-8 animate-bounce">
                  <Layout className="text-indigo-600" size={80} strokeWidth={1}/>
                </div>
-               <h3 className="text-3xl font-black text-slate-800 mb-4 tracking-tight">Belum Ada RPM</h3>
-               <p className="text-slate-500 max-w-lg mx-auto text-lg leading-relaxed">
-                 Pilih topik di sebelah kiri. CP, TP, Pedagogi, and Dimensi akan terisi otomatis oleh AI.
-               </p>
+               <h3 className="text-3xl font-black text-slate-800 mb-4">Belum Ada RPM</h3>
+               <p className="text-slate-500 max-w-lg mx-auto text-lg">Pilih materi pokok kurikulum merdeka semester 2 di sebelah kiri untuk memulai.</p>
             </div>
           )}
         </section>
