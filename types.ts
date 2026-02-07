@@ -37,6 +37,19 @@ export interface FormativeQuestion {
   answer: string;
 }
 
+export interface LKPDTask {
+  no: number;
+  activity: string;
+  instruction: string;
+}
+
+export interface LKPDContent {
+  title: string;
+  objective: string;
+  instructions: string[];
+  tasks: LKPDTask[];
+}
+
 export interface GeneratedRPMContent {
   students: string;
   interdisciplinary: string;

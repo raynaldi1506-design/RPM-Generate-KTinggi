@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { RPMFormData, GeneratedRPMContent, ProtaEntry, PromesEntry, PedagogicalPractice, GraduateDimension } from "../types";
+import { RPMFormData, GeneratedRPMContent, ProtaEntry, PromesEntry, PedagogicalPractice, GraduateDimension, LKPDContent } from "../types";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -150,6 +149,51 @@ export const generatePromes = async (subject: string, grade: string, semester: n
     }
   });
   return JSON.parse(response.text || '[]');
+};
+
+export const generateLKPD = async (subject: string, grade: string, material: string): Promise<LKPDContent> => {
+  const ai = getAI();
+  const prompt = `Sebagai pakar Kurikulum Merdeka, buatkan Lembar Kerja Peserta Didik (LKPD) yang menarik untuk:
+  Mata Pelajaran: ${subject}
+  Kelas: ${grade} SD
+  Materi: ${material}
+  
+  LKPD harus memuat:
+  1. Judul LKPD yang menarik.
+  2. Tujuan Pembelajaran singkat.
+  3. Petunjuk pengerjaan (list).
+  4. Daftar Tugas/Aktivitas Eksplorasi dalam bentuk tabel (minimal 5 langkah kegiatan).
+  
+  Output harus dalam format JSON.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          objective: { type: Type.STRING },
+          instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          tasks: { 
+            type: Type.ARRAY, 
+            items: { 
+              type: Type.OBJECT,
+              properties: {
+                no: { type: Type.INTEGER },
+                activity: { type: Type.STRING },
+                instruction: { type: Type.STRING }
+              }
+            }
+          }
+        },
+        required: ["title", "objective", "instructions", "tasks"]
+      }
+    }
+  });
+  return JSON.parse(response.text || '{}');
 };
 
 export const generateRPMContent = async (formData: RPMFormData): Promise<GeneratedRPMContent> => {

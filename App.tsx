@@ -9,7 +9,8 @@ import {
   SD_SUBJECTS,
   LibraryEntry,
   ProtaEntry,
-  PromesEntry
+  PromesEntry,
+  LKPDContent
 } from './types';
 import { 
   generateRPMContent, 
@@ -18,6 +19,7 @@ import {
   getAITopics,
   generateProta,
   generatePromes,
+  generateLKPD,
   ChapterInfo
 } from './services/geminiService';
 import { 
@@ -48,7 +50,8 @@ import {
   PenTool,
   BookMarked,
   Eye,
-  FileText
+  FileText,
+  UserPlus
 } from 'lucide-react';
 
 const TEACHERS = [
@@ -126,6 +129,7 @@ export default function App() {
 
   const [protaData, setProtaData] = useState<ProtaEntry[] | null>(null);
   const [promesData, setPromesData] = useState<PromesEntry[] | null>(null);
+  const [lkpdData, setLkpdData] = useState<LKPDContent | null>(null);
   const [isGeneratingExtra, setIsGeneratingExtra] = useState(false);
 
   useEffect(() => {
@@ -296,6 +300,19 @@ export default function App() {
     finally { setIsGeneratingExtra(false); }
   };
 
+  const handleGenLKPD = async () => {
+    if (!state.formData.material) {
+      alert("Pilih materi terlebih dahulu!");
+      return;
+    }
+    setIsGeneratingExtra(true);
+    try {
+      const data = await generateLKPD(state.formData.subject, state.formData.grade, state.formData.material);
+      setLkpdData(data);
+    } catch (e) { alert("Gagal menghasilkan LKPD."); }
+    finally { setIsGeneratingExtra(false); }
+  };
+
   const resetForm = () => {
     if (confirm("Reset data form?")) {
       localStorage.removeItem('rpm_form_data');
@@ -323,7 +340,7 @@ export default function App() {
     } else if (type === 'pdf') {
       html2pdf().from(element).set(opt).save();
     } else {
-      // WORD DOWNLOAD (Enhanced with Styles)
+      // WORD DOWNLOAD
       const contentHtml = element.innerHTML;
       const htmlHeader = `
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -432,19 +449,21 @@ export default function App() {
         </div>
       </header>
 
-      {/* PROTA/PROMES MODALS */}
-      {(protaData || promesData) && (
+      {/* MODALS for PROTA/PROMES/LKPD */}
+      {(protaData || promesData || lkpdData) && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-indigo-950/80 backdrop-blur-md p-4 no-print">
           <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3rem] overflow-hidden flex flex-col shadow-2xl">
             <div className="bg-indigo-900 p-8 flex justify-between items-center text-white">
                <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
-                 <ClipboardList size={28} /> {protaData ? "Program Tahunan" : "Program Semester"}
+                 {protaData && <><ClipboardList size={28} /> Program Tahunan</>}
+                 {promesData && <><Calendar size={28} /> Program Semester</>}
+                 {lkpdData && <><BookOpen size={28} /> Lembar Kerja Peserta Didik</>}
                </h3>
-               <button onClick={() => { setProtaData(null); setPromesData(null); }} className="p-2 hover:bg-white/10 rounded-full transition-colors"><Trash2 size={24} /></button>
+               <button onClick={() => { setProtaData(null); setPromesData(null); setLkpdData(null); }} className="p-2 hover:bg-white/10 rounded-full transition-colors"><Trash2 size={24} /></button>
             </div>
             <div className="flex-1 overflow-auto p-10 bg-slate-100">
                <div id="extra-print-area" className="bg-white p-12 shadow-md border border-slate-200 mx-auto max-w-[210mm]">
-                  {protaData ? (
+                  {protaData && (
                     <>
                       <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM TAHUNAN (PROTA) 2025/2026</h2>
                       <table className="table-spreadsheet">
@@ -454,7 +473,8 @@ export default function App() {
                         ))}</tbody>
                       </table>
                     </>
-                  ) : (
+                  )}
+                  {promesData && (
                     <>
                       <h2 className="text-center text-xl font-bold underline mb-8 uppercase">PROGRAM SEMESTER (PROMES) GENAP 2026</h2>
                       <table className="table-spreadsheet">
@@ -467,7 +487,7 @@ export default function App() {
                             {SEMESTER_2_MONTHS.map(m => <React.Fragment key={m.code}><th>1</th><th>2</th><th>3</th><th>4</th></React.Fragment>)}
                           </tr>
                         </thead>
-                        <tbody>{promesData?.map((item, idx) => (
+                        <tbody>{promesData.map((item, idx) => (
                           <tr key={idx}><td className="text-center font-bold">{idx + 1}</td><td>{item.material}</td><td className="text-center">{item.hours}</td>
                             {SEMESTER_2_MONTHS.map(m => <React.Fragment key={m.code}>{[1,2,3,4].map(w => (
                               <td key={w} className="text-center">{item.weeks.some(sw => sw.includes(m.code) && sw.includes(w.toString())) ? '●' : ''}</td>
@@ -477,11 +497,56 @@ export default function App() {
                       </table>
                     </>
                   )}
+                  {lkpdData && (
+                    <div className="f4-page">
+                      <h2 className="text-center text-xl font-bold underline mb-8 uppercase">{lkpdData.title}</h2>
+                      
+                      <table className="table-spreadsheet mb-8">
+                        <tbody>
+                          <tr><td className="col-key">Nama Siswa</td><td className="border-b border-dashed">................................................</td></tr>
+                          <tr><td className="col-key">Kelas / No. Absen</td><td className="border-b border-dashed">................................................</td></tr>
+                          <tr><td className="col-key">Mata Pelajaran</td><td>{state.formData.subject}</td></tr>
+                          <tr><td className="col-key">Topik</td><td className="font-bold">{state.formData.material}</td></tr>
+                        </tbody>
+                      </table>
+
+                      <div className="mb-6">
+                        <h4 className="font-bold underline mb-2">A. Tujuan Pembelajaran:</h4>
+                        <p className="text-sm italic">{lkpdData.objective}</p>
+                      </div>
+
+                      <div className="mb-8">
+                        <h4 className="font-bold underline mb-2">B. Petunjuk Pengerjaan:</h4>
+                        <ul className="list-disc ml-6 text-sm">
+                          {lkpdData.instructions.map((inst, i) => <li key={i}>{inst}</li>)}
+                        </ul>
+                      </div>
+
+                      <h4 className="font-bold underline mb-2">C. Aktivitas Eksplorasi:</h4>
+                      <table className="table-spreadsheet">
+                        <thead className="table-header-pink">
+                          <tr><th className="text-center" style={{width: '40px'}}>No</th><th className="text-center">Aktivitas / Pertanyaan</th><th className="text-center">Hasil Eksplorasi / Jawaban</th></tr>
+                        </thead>
+                        <tbody>
+                          {lkpdData.tasks.map((task, idx) => (
+                            <tr key={idx}>
+                              <td className="text-center font-bold">{task.no}</td>
+                              <td className="p-4">
+                                <p className="font-bold text-sm mb-1">{task.activity}</p>
+                                <p className="text-[10px] text-slate-500">{task.instruction}</p>
+                              </td>
+                              <td className="h-24"></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                </div>
             </div>
             <div className="p-8 border-t bg-white flex justify-end gap-4">
-               <button onClick={() => downloadDocument('extra-print-area', 'Administrasi', 'word')} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg">WORD</button>
-               <button onClick={() => downloadDocument('extra-print-area', 'Administrasi', 'pdf')} className="bg-rose-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg">PDF</button>
+               <button onClick={() => downloadDocument('extra-print-area', lkpdData ? 'LKPD' : 'Administrasi', 'word')} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg flex items-center gap-2"><Download size={16}/> WORD</button>
+               <button onClick={() => downloadDocument('extra-print-area', lkpdData ? 'LKPD' : 'Administrasi', 'pdf')} className="bg-rose-600 text-white px-8 py-3 rounded-2xl font-black text-sm shadow-lg flex items-center gap-2"><Printer size={16}/> PDF</button>
             </div>
           </div>
         </div>
@@ -502,10 +567,11 @@ export default function App() {
         {/* FORM SECTION */}
         <section className="lg:col-span-4 xl:col-span-4 no-print space-y-8 pb-12">
           <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden sticky top-32">
-            <div className="bg-indigo-800 px-10 py-8 border-b border-indigo-900/10">
+            <div className="bg-indigo-800 px-10 py-8 border-b border-indigo-900/10 flex justify-between items-center">
               <h2 className="text-xl font-black text-white uppercase flex items-center gap-3">
                 <PenTool size={24} className="text-indigo-300" /> Input Data RPM
               </h2>
+              {isGeneratingExtra && <Loader2 className="animate-spin text-white" size={20}/>}
             </div>
             
             <form onSubmit={handleSubmit} className="p-10 space-y-10 max-h-[75vh] overflow-y-auto custom-scrollbar">
@@ -530,17 +596,20 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <button type="button" onClick={handleGenProta} className="py-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-2xl font-black text-xs flex items-center justify-center gap-2">
-                    <ClipboardList size={16}/> PROTA
+                <div className="grid grid-cols-3 gap-3">
+                  <button type="button" onClick={handleGenProta} className="py-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-amber-100 transition-colors">
+                    <ClipboardList size={20}/> PROTA
                   </button>
-                  <button type="button" onClick={handleGenPromes} className="py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-xs flex items-center justify-center gap-2">
-                    <Calendar size={16}/> PROMES
+                  <button type="button" onClick={handleGenPromes} className="py-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 transition-colors">
+                    <Calendar size={20}/> PROMES
+                  </button>
+                  <button type="button" onClick={handleGenLKPD} className="py-4 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-2xl font-black text-[10px] flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 transition-colors">
+                    <BookOpen size={20}/> LKPD
                   </button>
                 </div>
               </div>
 
-              {/* TOPIK/MATERI DROPDOWN (DETAIL) */}
+              {/* TOPIK/MATERI DROPDOWN */}
               <div className="space-y-6" ref={comboboxRef}>
                 <label className="text-[10px] font-black text-indigo-700 uppercase flex items-center gap-2 mb-2">
                   Pilih Bab & Materi Pokok (Smt 2) {isFetchingTopics && <Loader2 className="animate-spin" size={12}/>}
